@@ -146,6 +146,30 @@
       display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
     }
     .repo-title h2 { font-size: 18px; }
+
+    /* クローンURL */
+    .clone-url-box {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 12px; margin-bottom: 20px;
+      font-family: monospace; font-size: 13px;
+    }
+    .clone-url-box .clone-label {
+      color: var(--muted); font-size: 11px; font-family: 'Segoe UI', sans-serif;
+      white-space: nowrap;
+    }
+    .clone-url-box code {
+      flex: 1; color: var(--text); overflow-x: auto; white-space: nowrap;
+      user-select: all;
+    }
+    .btn-copy {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); font-size: 12px; padding: 4px 10px;
+      border-radius: 4px; cursor: pointer; white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .btn-copy:hover { color: var(--text); border-color: var(--text); }
+    .btn-copy.copied { color: var(--accent); border-color: var(--accent); }
   </style>
 </head>
 <body>
@@ -354,6 +378,27 @@
     return p;
   }
 
+  // --- クローンURL ---
+  function getCloneUrl() {
+    const host = location.hostname;
+    if (currentVisibility === 'private' && currentOwner) {
+      return `http://${currentOwner}@${host}/git/private/${currentOwner}/${currentRepo}`;
+    }
+    return `http://${host}/git/public/${currentRepo}`;
+  }
+
+  function copyCloneUrl(btn) {
+    const url = getCloneUrl();
+    navigator.clipboard.writeText(url).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
   // --- ダッシュボード ---
   async function renderDashboard() {
     const c = document.getElementById('content');
@@ -364,9 +409,15 @@
       const visLabel = currentVisibility === 'private'
         ? '<span class="badge badge-private">private</span>'
         : '<span class="badge badge-public">public</span>';
+      const cloneUrl = getCloneUrl();
       c.innerHTML = `
         <div class="repo-title">
           <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}
+        </div>
+        <div class="clone-url-box">
+          <span class="clone-label">Clone:</span>
+          <code>${escHtml(cloneUrl)}</code>
+          <button class="btn-copy" onclick="copyCloneUrl(this)">Copy</button>
         </div>
         <div class="stats">
           <div class="stat-card">
