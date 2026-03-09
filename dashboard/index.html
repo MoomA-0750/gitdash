@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Git Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #e6edf3; --muted: #8b949e; --accent: #2ea44f;
+      --blue: #58a6ff; --red: #f85149; --yellow: #d29922;
+      --private: #d29922;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text);
+           font-family: 'Segoe UI', sans-serif; display: flex;
+           min-height: 100vh; }
+
+    /* ログインモーダル */
+    #login-modal {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    #login-modal.show { display: flex; }
+    .modal-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 32px; width: 360px;
+    }
+    .modal-box h2 { color: var(--blue); margin-bottom: 20px; font-size: 18px; }
+    .modal-box input {
+      width: 100%; padding: 8px 12px; margin-bottom: 12px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 14px;
+    }
+    .modal-box input:focus { outline: none; border-color: var(--blue); }
+    .btn {
+      padding: 8px 16px; border-radius: 6px; border: none;
+      cursor: pointer; font-size: 13px; font-weight: 600;
+    }
+    .btn-primary { background: var(--accent); color: #fff; width: 100%; }
+    .btn-primary:hover { background: #3cb55a; }
+    .btn-link { background: none; color: var(--muted); font-size: 12px;
+                padding: 4px; margin-top: 8px; }
+    .btn-link:hover { color: var(--text); }
+    .modal-error { color: var(--red); font-size: 12px; margin-bottom: 8px; }
+
+    /* サイドバー */
+    #sidebar {
+      width: 240px; min-height: 100vh; background: var(--surface);
+      border-right: 1px solid var(--border); padding: 16px;
+      display: flex; flex-direction: column;
+    }
+    .sidebar-header { margin-bottom: 16px; }
+    .sidebar-header h1 { color: var(--blue); font-size: 15px; margin-bottom: 8px; }
+    .user-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 12px; color: var(--muted); padding: 6px 0;
+      border-bottom: 1px solid var(--border); margin-bottom: 12px;
+    }
+    .user-bar .username { color: var(--text); font-weight: 600; }
+    .btn-logout {
+      background: none; border: 1px solid var(--border);
+      color: var(--muted); font-size: 11px; padding: 2px 8px;
+      border-radius: 4px; cursor: pointer;
+    }
+    .btn-logout:hover { color: var(--text); border-color: var(--text); }
+    .btn-login {
+      background: var(--accent); border: none; color: #fff;
+      font-size: 11px; padding: 3px 10px; border-radius: 4px; cursor: pointer;
+    }
+    .section-label {
+      font-size: 11px; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.5px; margin: 12px 0 6px;
+    }
+    .repo-item {
+      padding: 7px 10px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; margin-bottom: 2px; color: var(--muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .repo-item:hover, .repo-item.active { background: var(--border); color: var(--text); }
+    .badge {
+      font-size: 10px; padding: 1px 6px; border-radius: 10px;
+      margin-left: auto; flex-shrink: 0;
+    }
+    .badge-private { background: rgba(210,153,34,0.2); color: var(--private); }
+    .badge-public  { background: rgba(46,164,79,0.15); color: var(--accent); }
+
+    /* メイン */
+    #main { flex: 1; padding: 24px; overflow-y: auto; }
+    .tabs {
+      display: flex; gap: 4px; margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 8px 16px; cursor: pointer; font-size: 13px;
+      color: var(--muted); border-bottom: 2px solid transparent;
+    }
+    .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+    /* コミット */
+    .commit {
+      padding: 12px 16px; border: 1px solid var(--border);
+      border-radius: 6px; margin-bottom: 8px;
+    }
+    .commit-title { font-weight: 600; margin-bottom: 4px; }
+    .commit-meta { font-size: 12px; color: var(--muted); }
+    .commit-hash {
+      font-family: monospace; color: var(--blue);
+      cursor: pointer; font-size: 12px;
+    }
+    .commit-hash:hover { text-decoration: underline; }
+
+    /* diff */
+    pre.diff {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 16px; overflow-x: auto;
+      font-family: monospace; font-size: 12px; line-height: 1.5;
+    }
+    .diff-add { color: #3fb950; }
+    .diff-del { color: var(--red); }
+    .diff-hunk { color: var(--blue); }
+
+    /* ファイルツリー */
+    .file-item {
+      padding: 6px 12px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid var(--border); display: flex; gap: 8px;
+    }
+    .file-item:hover { background: var(--surface); }
+
+    /* ダッシュボード */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 20px; text-align: center;
+    }
+    .stat-num { font-size: 32px; font-weight: 700; color: var(--blue); }
+    .stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    .loading { color: var(--muted); text-align: center; padding: 40px; }
+    .error {
+      color: var(--red); padding: 12px; border: 1px solid var(--red);
+      border-radius: 6px; margin-bottom: 12px;
+    }
+    .repo-title {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+    }
+    .repo-title h2 { font-size: 18px; }
+  </style>
+</head>
+<body>
+
+<!-- ログインモーダル -->
+<div id="login-modal">
+  <div class="modal-box">
+    <h2>🔐 ログイン</h2>
+    <div id="login-error" class="modal-error" style="display:none"></div>
+    <input type="text" id="login-user" placeholder="ユーザー名" autocomplete="username">
+    <input type="password" id="login-pass" placeholder="パスワード" autocomplete="current-password">
+    <button class="btn btn-primary" onclick="doLogin()">ログイン</button>
+    <div style="text-align:center;margin-top:8px;">
+      <button class="btn btn-link" onclick="closeLogin()">キャンセル（パブリックのみ表示）</button>
+    </div>
+  </div>
+</div>
+
+<div id="sidebar">
+  <div class="sidebar-header">
+    <h1>Git Dashboard</h1>
+    <div class="user-bar" id="user-bar">
+      <span id="user-label">未ログイン</span>
+      <button class="btn-login" onclick="showLogin()">ログイン</button>
+    </div>
+  </div>
+
+  <div class="section-label">Public</div>
+  <div id="repo-list-public"><div class="loading" style="padding:8px;font-size:12px;">Loading...</div></div>
+
+  <div id="private-section" style="display:none">
+    <div class="section-label">Private</div>
+    <div id="repo-list-private"></div>
+  </div>
+</div>
+
+<div id="main">
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('dashboard')">Dashboard</div>
+    <div class="tab" onclick="showTab('commits')">Commits</div>
+    <div class="tab" onclick="showTab('files')">Files</div>
+    <div class="tab" onclick="showTab('diff')">Diff</div>
+  </div>
+  <div id="content"><div class="loading">リポジトリを選択してください</div></div>
+</div>
+
+<script>
+  const API = '/api/api.py';
+  let currentRepo = null;       // repo name
+  let currentVisibility = 'public';
+  let currentOwner = null;
+  let currentTab = 'dashboard';
+  let authHeader = null;        // "Basic xxxx" or null
+  let currentUsername = null;
+
+  // --- 認証ヘルパー ---
+  function makeBasicAuth(user, pass) {
+    return 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)));
+  }
+
+  async function apiFetch(params, auth) {
+    const qs = new URLSearchParams(params).toString();
+    const headers = {};
+    const a = auth !== undefined ? auth : authHeader;
+    if (a) headers['Authorization'] = a;
+    const res = await fetch(`${API}?${qs}`, { headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  // --- ログインモーダル ---
+  function showLogin() {
+    document.getElementById('login-modal').classList.add('show');
+    document.getElementById('login-user').focus();
+  }
+  function closeLogin() {
+    document.getElementById('login-modal').classList.remove('show');
+    document.getElementById('login-error').style.display = 'none';
+  }
+
+  async function doLogin() {
+    const user = document.getElementById('login-user').value.trim();
+    const pass = document.getElementById('login-pass').value;
+    if (!user || !pass) return;
+    const auth = makeBasicAuth(user, pass);
+    try {
+      const data = await apiFetch({ action: 'repos' }, auth);
+      if (data.username) {
+        authHeader = auth;
+        currentUsername = data.username;
+        closeLogin();
+        updateUserBar();
+        renderRepoList(data.repos);
+      } else {
+        document.getElementById('login-error').textContent = 'ユーザー名またはパスワードが違います';
+        document.getElementById('login-error').style.display = 'block';
+      }
+    } catch (e) {
+      document.getElementById('login-error').textContent = `エラー: ${e.message}`;
+      document.getElementById('login-error').style.display = 'block';
+    }
+  }
+
+  // Enter キーでログイン
+  document.getElementById('login-pass').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  function doLogout() {
+    authHeader = null;
+    currentUsername = null;
+    currentRepo = null;
+    updateUserBar();
+    loadRepos();
+    document.getElementById('content').innerHTML =
+      '<div class="loading">リポジトリを選択してください</div>';
+  }
+
+  function updateUserBar() {
+    const bar = document.getElementById('user-bar');
+    if (currentUsername) {
+      bar.innerHTML = `
+        <span class="username">👤 ${escHtml(currentUsername)}</span>
+        <button class="btn-logout" onclick="doLogout()">ログアウト</button>`;
+    } else {
+      bar.innerHTML = `
+        <span id="user-label">未ログイン</span>
+        <button class="btn-login" onclick="showLogin()">ログイン</button>`;
+    }
+  }
+
+  // --- リポジトリ一覧 ---
+  async function loadRepos() {
+    try {
+      const data = await apiFetch({ action: 'repos' });
+      renderRepoList(data.repos);
+    } catch (e) {
+      document.getElementById('repo-list-public').innerHTML =
+        `<div class="error" style="font-size:12px;">Error: ${e.message}</div>`;
+    }
+  }
+
+  function renderRepoList(repos) {
+    const pubList  = document.getElementById('repo-list-public');
+    const privList = document.getElementById('repo-list-private');
+    const privSec  = document.getElementById('private-section');
+
+    pubList.innerHTML  = '';
+    privList.innerHTML = '';
+
+    const pubRepos  = repos.filter(r => r.visibility === 'public');
+    const privRepos = repos.filter(r => r.visibility === 'private');
+
+    pubRepos.forEach(repo => pubList.appendChild(makeRepoItem(repo)));
+
+    if (privRepos.length > 0) {
+      privSec.style.display = 'block';
+      privRepos.forEach(repo => privList.appendChild(makeRepoItem(repo)));
+    } else {
+      privSec.style.display = 'none';
+    }
+  }
+
+  function makeRepoItem(repo) {
+    const div = document.createElement('div');
+    div.className = 'repo-item';
+    const label = repo.name.replace('.git', '');
+    const badge = repo.visibility === 'private'
+      ? '<span class="badge badge-private">private</span>'
+      : '<span class="badge badge-public">public</span>';
+    div.innerHTML = `<span>${escHtml(label)}</span>${badge}`;
+    div.onclick = () => selectRepo(repo, div);
+    return div;
+  }
+
+  function selectRepo(repo, el) {
+    document.querySelectorAll('.repo-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+    currentRepo       = repo.name;
+    currentVisibility = repo.visibility;
+    currentOwner      = repo.owner;
+    showTab(currentTab);
+  }
+
+  // --- タブ ---
+  function showTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      t.classList.toggle('active',
+        ['dashboard', 'commits', 'files', 'diff'][i] === tab);
+    });
+    if (!currentRepo) {
+      document.getElementById('content').innerHTML =
+        '<div class="loading">リポジトリを選択してください</div>';
+      return;
+    }
+    if (tab === 'dashboard') renderDashboard();
+    else if (tab === 'commits') renderCommits();
+    else if (tab === 'files') renderFiles();
+    else if (tab === 'diff') renderDiff();
+  }
+
+  function repoParams(extra) {
+    const p = { repo: currentRepo, visibility: currentVisibility, ...extra };
+    if (currentOwner) p.owner = currentOwner;
+    return p;
+  }
+
+  // --- ダッシュボード ---
+  async function renderDashboard() {
+    const c = document.getElementById('content');
+    c.innerHTML = '<div class="loading">Loading...</div>';
+    try {
+      const data = await apiFetch(repoParams({ action: 'commits' }));
+      const latest = data.commits[0] || {};
+      const visLabel = currentVisibility === 'private'
+        ? '<span class="badge badge-private">private</span>'
+        : '<span class="badge badge-public">public</span>';
+      c.innerHTML = `
+        <div class="repo-title">
+          <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}
+        </div>
+        <div class="stats">
+          <div class="stat-card">
+            <div class="stat-num">${data.commits.length}</div>
+            <div class="stat-label">Recent Commits</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" style="font-size:18px">${escHtml(latest.author || '-')}</div>
+            <div class="stat-label">Latest Author</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" style="font-size:20px">${latest.date ? latest.date.split('T')[0] : '-'}</div>
+            <div class="stat-label">Last Commit</div>
+          </div>
+        </div>
+        <div style="margin-top:20px;">
+          <h3 style="color:var(--muted);font-size:13px;margin-bottom:12px;">LATEST COMMITS</h3>
+          ${data.commits.slice(0, 5).map(renderCommitCard).join('')}
+        </div>`;
+    } catch (e) {
+      c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+    }
+  }
+
+  function renderCommitCard(commit) {
+    const hash = (commit.hash || '').substring(0, 7);
+    const date = (commit.date || '').split('T')[0];
+    return `<div class="commit">
+      <div class="commit-title">${escHtml(commit.title)}</div>
+      <div class="commit-meta">
+        <span class="commit-hash" onclick="loadDiff('${escHtml(commit.hash)}')">${hash}</span>
+        &nbsp;·&nbsp;${escHtml(commit.author)}&nbsp;·&nbsp;${date}
+      </div></div>`;
+  }
+
+  // --- コミット一覧 ---
+  async function renderCommits() {
+    const c = document.getElementById('content');
+    c.innerHTML = '<div class="loading">Loading...</div>';
+    try {
+      const data = await apiFetch(repoParams({ action: 'commits' }));
+      c.innerHTML = data.commits.length
+        ? data.commits.map(renderCommitCard).join('')
+        : '<div class="loading">コミットがありません</div>';
+    } catch (e) {
+      c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+    }
+  }
+
+  // --- ファイルツリー ---
+  async function renderFiles(path = '') {
+    const c = document.getElementById('content');
+    c.innerHTML = '<div class="loading">Loading...</div>';
+    try {
+      const data = await apiFetch(repoParams({ action: 'tree', f: path }));
+      const breadcrumb = path
+        ? `<div style="margin-bottom:12px;color:var(--muted);font-size:12px;">📁 ${escHtml(path)}</div>`
+        : '';
+      const back = path
+        ? `<div class="file-item" onclick="renderFiles('${escHtml(path.split('/').slice(0,-1).join('/'))}')">
+             <span>📁</span> ..</div>`
+        : '';
+      const items = data.files.map(f => {
+        const icon = f.type === 'tree' ? '📁' : '📄';
+        const onclick = f.type === 'tree'
+          ? `renderFiles('${escHtml(f.path)}')`
+          : currentVisibility === 'private'
+            ? `alert('ファイル内容の表示は /gitweb/ では非対応（プライベートリポジトリ）')`
+            : `window.open('/gitweb/?p=${encodeURIComponent(currentRepo)}&a=blob&f=${encodeURIComponent(f.path)}&hb=HEAD')`;
+        return `<div class="file-item" onclick="${onclick}">
+          <span>${icon}</span>${escHtml(f.name)}</div>`;
+      }).join('');
+      c.innerHTML = breadcrumb + '<div>' + back + items + '</div>';
+    } catch (e) {
+      c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+    }
+  }
+
+  // --- diff ---
+  async function renderDiff(h = '') {
+    const c = document.getElementById('content');
+    if (!h) {
+      c.innerHTML = '<div class="loading">コミットハッシュをクリックして差分を表示</div>';
+      return;
+    }
+    c.innerHTML = '<div class="loading">Loading diff...</div>';
+    try {
+      const data = await apiFetch(repoParams({ action: 'diff', h }));
+      const lines = data.diff.split('\n').map(line => {
+        if (line.startsWith('+')) return `<span class="diff-add">${escHtml(line)}</span>`;
+        if (line.startsWith('-')) return `<span class="diff-del">${escHtml(line)}</span>`;
+        if (line.startsWith('@@')) return `<span class="diff-hunk">${escHtml(line)}</span>`;
+        return escHtml(line);
+      }).join('\n');
+      c.innerHTML = `<pre class="diff">${lines}</pre>`;
+    } catch (e) {
+      c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+    }
+  }
+
+  function loadDiff(hash) {
+    showTab('diff');
+    renderDiff(hash);
+  }
+
+  function escHtml(s) {
+    return String(s || '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // 初期化
+  loadRepos();
+</script>
+</body>
+</html>
