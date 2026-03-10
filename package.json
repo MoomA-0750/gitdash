@@ -1,0 +1,11 @@
+{
+  "name": "gitdash",
+  "version": "1.0.0",
+  "description": "Git Dashboard - RHEL10 offline Git web UI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "private": true
+}
