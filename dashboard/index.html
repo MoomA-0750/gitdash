@@ -24,7 +24,10 @@
 
 <div id="sidebar">
   <div class="sidebar-header">
-    <h1>Git Dashboard</h1>
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <h1>Git Dashboard</h1>
+      <button class="btn-create-repo" id="btn-create-repo" onclick="showCreateRepo()" title="新規リポジトリ作成" style="display:none">＋</button>
+    </div>
     <div class="user-bar" id="user-bar">
       <span id="user-label">未ログイン</span>
       <button class="btn-login" onclick="showLogin()">ログイン</button>
@@ -48,6 +51,30 @@
     <div class="tab" onclick="showTab('diff')">Diff</div>
   </div>
   <div id="content"><div class="loading">リポジトリを選択してください</div></div>
+</div>
+
+<!-- リポジトリ作成モーダル -->
+<div id="create-repo-modal">
+  <div class="modal-box">
+    <h2>📦 新規リポジトリ</h2>
+    <div id="create-repo-error" class="modal-error" style="display:none"></div>
+    <input type="text" id="create-repo-name" placeholder="リポジトリ名（例: my-project）">
+    <textarea id="create-repo-desc" placeholder="説明（任意）" rows="3"></textarea>
+    <div class="radio-group">
+      <label class="radio-label">
+        <input type="radio" name="create-repo-vis" value="public" checked>
+        <span class="badge badge-public">public</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="create-repo-vis" value="private">
+        <span class="badge badge-private">private</span>
+      </label>
+    </div>
+    <button class="btn btn-primary" onclick="doCreateRepo()">作成</button>
+    <div style="text-align:center;margin-top:8px;">
+      <button class="btn btn-link" onclick="closeCreateRepo()">キャンセル</button>
+    </div>
+  </div>
 </div>
 
 <script src="/static/app.js"></script>

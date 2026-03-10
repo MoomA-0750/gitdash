@@ -50,6 +50,22 @@ function serveStatic(req, res, filePath) {
   });
 }
 
+// --- POST body パーサー ---
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (e) {
+        reject(new Error('Invalid JSON'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
 // --- API ハンドラー ---
 async function handleApi(req, res, params) {
   const action     = params.get('action') || '';
@@ -96,6 +112,21 @@ async function handleApi(req, res, params) {
           readmeData.readmeHtml = '';
         }
         sendJson(res, readmeData);
+        break;
+      }
+      case 'create_repo': {
+        // 認証必須
+        const username = await getCurrentUser(req);
+        if (!username) {
+          return sendError(res, 'ログインが必要です', 401);
+        }
+        const body = await readBody(req);
+        const repoName = body.repoName || '';
+        const repoVisibility = body.visibility || 'public';
+        const description = body.description || '';
+        const repoOwner = repoVisibility === 'private' ? username : null;
+        const result = await git.createRepo(repoName, repoVisibility, repoOwner, description);
+        sendJson(res, result);
         break;
       }
       default:

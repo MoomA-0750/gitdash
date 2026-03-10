@@ -21,6 +21,22 @@ async function apiFetch(params, auth) {
   return res.json();
 }
 
+// --- API POST ヘルパー ---
+async function apiPost(action, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authHeader) headers['Authorization'] = authHeader;
+  const res = await fetch(`${API}?action=${encodeURIComponent(action)}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 // --- ログインモーダル ---
 function showLogin() {
   document.getElementById('login-modal').classList.add('show');
@@ -71,14 +87,63 @@ function doLogout() {
 
 function updateUserBar() {
   const bar = document.getElementById('user-bar');
+  const createBtn = document.getElementById('btn-create-repo');
   if (currentUsername) {
     bar.innerHTML = `
       <span class="username">👤 ${escHtml(currentUsername)}</span>
       <button class="btn-logout" onclick="doLogout()">ログアウト</button>`;
+    if (createBtn) createBtn.style.display = 'flex';
   } else {
     bar.innerHTML = `
       <span id="user-label">未ログイン</span>
       <button class="btn-login" onclick="showLogin()">ログイン</button>`;
+    if (createBtn) createBtn.style.display = 'none';
+  }
+}
+
+// --- リポジトリ作成モーダル ---
+function showCreateRepo() {
+  if (!currentUsername) {
+    showLogin();
+    return;
+  }
+  document.getElementById('create-repo-modal').classList.add('show');
+  document.getElementById('create-repo-name').focus();
+}
+
+function closeCreateRepo() {
+  document.getElementById('create-repo-modal').classList.remove('show');
+  document.getElementById('create-repo-error').style.display = 'none';
+  document.getElementById('create-repo-name').value = '';
+  document.getElementById('create-repo-desc').value = '';
+  document.querySelector('input[name="create-repo-vis"][value="public"]').checked = true;
+}
+
+async function doCreateRepo() {
+  const repoName = document.getElementById('create-repo-name').value.trim();
+  const description = document.getElementById('create-repo-desc').value.trim();
+  const visibility = document.querySelector('input[name="create-repo-vis"]:checked').value;
+  const errEl = document.getElementById('create-repo-error');
+
+  if (!repoName) {
+    errEl.textContent = 'リポジトリ名を入力してください';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  if (!/^[a-zA-Z0-9._-]+$/.test(repoName)) {
+    errEl.textContent = '英数字・ハイフン・アンダースコア・ドットのみ使用できます';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    await apiPost('create_repo', { repoName, visibility, description });
+    closeCreateRepo();
+    await loadRepos();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
   }
 }
 
@@ -195,11 +260,45 @@ async function renderDashboard() {
       apiFetch(repoParams({ action: 'commits' })),
       apiFetch(repoParams({ action: 'readme' }))
     ]);
-    const latest = data.commits[0] || {};
     const visLabel = currentVisibility === 'private'
       ? '<span class="badge badge-private">private</span>'
       : '<span class="badge badge-public">public</span>';
     const cloneUrl = getCloneUrl();
+
+    // 空リポジトリの場合
+    if (data.empty) {
+      c.innerHTML = `
+        <div class="repo-title">
+          <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}
+        </div>
+        <div class="clone-url-box">
+          <span class="clone-label">Clone:</span>
+          <code>${escHtml(cloneUrl)}</code>
+          <button class="btn-copy" onclick="copyCloneUrl(this)">Copy</button>
+        </div>
+        <div class="empty-repo-guide">
+          <h3>📭 空のリポジトリです</h3>
+          <p>このリポジトリにはまだコミットがありません。<br>以下の手順で最初のコミットを追加してください。</p>
+          <div class="code-guide">
+            <h4>新規プロジェクトを開始する場合</h4>
+            <pre>git clone ${escHtml(cloneUrl)}
+cd ${escHtml(currentRepo.replace('.git',''))}
+echo "# ${escHtml(currentRepo.replace('.git',''))}" &gt; README.md
+git add README.md
+git commit -m "Initial commit"
+git push origin main</pre>
+          </div>
+          <div class="code-guide">
+            <h4>既存のプロジェクトをプッシュする場合</h4>
+            <pre>cd your-project
+git remote add origin ${escHtml(cloneUrl)}
+git push -u origin main</pre>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const latest = data.commits[0] || {};
     // readmeHtml はサーバーサイドで変換済み
     const readmeHtml = readmeData.readmeHtml
       ? `<div class="readme-box">
@@ -257,9 +356,13 @@ async function renderCommits() {
   c.innerHTML = '<div class="loading">Loading...</div>';
   try {
     const data = await apiFetch(repoParams({ action: 'commits' }));
-    c.innerHTML = data.commits.length
-      ? data.commits.map(renderCommitCard).join('')
-      : '<div class="loading">コミットがありません</div>';
+    if (data.empty) {
+      c.innerHTML = '<div class="loading">空のリポジトリです — まだコミットがありません</div>';
+    } else {
+      c.innerHTML = data.commits.length
+        ? data.commits.map(renderCommitCard).join('')
+        : '<div class="loading">コミットがありません</div>';
+    }
   } catch (e) {
     c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
   }
@@ -271,6 +374,10 @@ async function renderFiles(filePath = '') {
   c.innerHTML = '<div class="loading">Loading...</div>';
   try {
     const data = await apiFetch(repoParams({ action: 'tree', f: filePath }));
+    if (data.empty) {
+      c.innerHTML = '<div class="loading">空のリポジトリです — ファイルがありません</div>';
+      return;
+    }
     const breadcrumb = filePath
       ? `<div style="margin-bottom:12px;color:var(--muted);font-size:12px;">📁 ${escHtml(filePath)}</div>`
       : '';

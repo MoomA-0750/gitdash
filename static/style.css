@@ -594,3 +594,120 @@ pre.diff {
   color: var(--accent);
   border-color: var(--accent);
 }
+
+/* リポジトリ作成ボタン */
+.btn-create-repo {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.15s;
+}
+
+.btn-create-repo:hover {
+  background: #3cb55a;
+}
+
+/* リポジトリ作成モーダル */
+#create-repo-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+
+#create-repo-modal.show {
+  display: flex;
+}
+
+.modal-box textarea {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: 'Segoe UI', sans-serif;
+  resize: vertical;
+}
+
+.modal-box textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.radio-group {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.radio-label input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+/* 空リポジトリガイド */
+.empty-repo-guide {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 32px;
+  margin-top: 20px;
+}
+
+.empty-repo-guide h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.empty-repo-guide p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.code-guide {
+  margin-bottom: 16px;
+}
+
+.code-guide h4 {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.code-guide pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: var(--text);
+  user-select: all;
+}
