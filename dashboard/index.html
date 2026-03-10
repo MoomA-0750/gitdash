@@ -137,6 +137,57 @@
     .stat-num { font-size: 32px; font-weight: 700; color: var(--blue); }
     .stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
+    /* README */
+    .readme-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 24px 28px; margin-top: 20px;
+    }
+    .readme-header {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--muted); margin-bottom: 16px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    .readme-body { font-size: 14px; line-height: 1.7; color: var(--text); }
+    .readme-body h1 { font-size: 24px; margin: 16px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .readme-body h2 { font-size: 20px; margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+    .readme-body h3 { font-size: 16px; margin: 12px 0 4px; }
+    .readme-body h4 { font-size: 14px; margin: 10px 0 4px; }
+    .readme-body p { margin: 8px 0; }
+    .readme-body ul, .readme-body ol { margin: 8px 0; padding-left: 24px; }
+    .readme-body li { margin: 4px 0; }
+    .readme-body code {
+      background: var(--bg); padding: 2px 6px; border-radius: 4px;
+      font-family: monospace; font-size: 13px;
+    }
+    .readme-body pre {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 12px 16px; overflow-x: auto;
+      margin: 8px 0;
+    }
+    .readme-body pre code { background: none; padding: 0; font-size: 12px; line-height: 1.5; }
+    .readme-body .code-block { margin: 8px 0; }
+    .readme-body .code-block .code-header {
+      background: var(--border); padding: 4px 12px; border-radius: 6px 6px 0 0;
+      font-size: 11px; color: var(--muted); font-family: 'Segoe UI', sans-serif;
+    }
+    .readme-body .code-block pre {
+      margin: 0; border-radius: 0 0 6px 6px; border-top: none;
+    }
+    .readme-body input[type="checkbox"] { margin-right: 4px; }
+    .readme-body blockquote {
+      border-left: 3px solid var(--border); padding-left: 12px;
+      color: var(--muted); margin: 8px 0;
+    }
+    .readme-body a { color: var(--blue); text-decoration: none; }
+    .readme-body a:hover { text-decoration: underline; }
+    .readme-body hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+    .readme-body table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+    .readme-body th, .readme-body td {
+      border: 1px solid var(--border); padding: 6px 12px; text-align: left;
+    }
+    .readme-body th { background: var(--bg); }
+    .readme-body img { max-width: 100%; }
+
     .loading { color: var(--muted); text-align: center; padding: 40px; }
     .error {
       color: var(--red); padding: 12px; border: 1px solid var(--red);
@@ -405,17 +456,279 @@
     }, 2000);
   }
 
+  // --- マークダウンパーサー（word-box/lib/markdown.js ベース） ---
+  function parseMarkdown(md) {
+    let html = md;
+
+    // コードブロック（先に処理してプレースホルダーで保護）
+    const codeBlocks = [];
+    html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+      const placeholder = `___CODE_BLOCK_${codeBlocks.length}___`;
+      const language = lang || 'text';
+      const escaped = escHtml(code.trim());
+      codeBlocks.push(`<div class="code-block"><div class="code-header"><span class="code-language">${language}</span></div><pre><code>${escaped}</code></pre></div>`);
+      return placeholder;
+    });
+
+    // テーブルをパース（プレースホルダーで保護）
+    const tables = [];
+    html = parseTablesWithPlaceholder(html, tables);
+
+    // ここからescHtml（コードブロック・テーブル以外）
+    html = escHtml(html);
+
+    // プレースホルダーがエスケープされないよう復元用マーカーを保護
+    // （escHtmlはプレースホルダーの___を壊さない）
+
+    // インラインコード
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // 画像（リンクより先に処理）
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+
+    // リンク
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    // 見出し
+    html = html.replace(/^##### (.+)$/gm, '<h5>$1</h5>');
+    html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+    // 水平線
+    html = html.replace(/\n---+\n/g, '\n<hr>\n');
+    html = html.replace(/\n\*\*\*+\n/g, '\n<hr>\n');
+    html = html.replace(/\n___+\n/g, '\n<hr>\n');
+
+    // ネストリストをパース
+    html = parseNestedLists(html);
+
+    // 打ち消し線
+    html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+    // 強調（**bold**, *italic*）
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // 引用（エスケープ後は &gt;）
+    html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // 段落（空行で区切る）
+    const paragraphs = html.split(/\n\n+/);
+    html = paragraphs.map(p => {
+      p = p.trim();
+      if (!p) return '';
+      // すでにタグで囲まれている場合はそのまま
+      if (p.match(/^<(h[1-6]|ul|ol|pre|hr|blockquote|img|div)/)) return p;
+      // プレースホルダーのみの場合はスキップ
+      if (p.match(/^___(CODE_BLOCK|TABLE)_\d+___$/)) return p;
+      // プレースホルダーを含む場合は分離して処理
+      if (p.match(/___(CODE_BLOCK|TABLE)_\d+___/)) {
+        const parts = p.split(/(___(CODE_BLOCK|TABLE)_\d+___)/);
+        return parts.map(part => {
+          if (part.match(/^___(CODE_BLOCK|TABLE)_\d+___$/)) return part;
+          if (part.match(/^(CODE_BLOCK|TABLE)$/)) return '';
+          const trimmed = part.trim();
+          if (!trimmed) return '';
+          return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+        }).filter(x => x).join('\n');
+      }
+      return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+    }).join('\n');
+
+    // コードブロックを復元
+    codeBlocks.forEach((code, i) => {
+      html = html.replace(`___CODE_BLOCK_${i}___`, code);
+    });
+
+    // テーブルを復元
+    tables.forEach((table, i) => {
+      html = html.replace(`___TABLE_${i}___`, table);
+    });
+
+    return html;
+  }
+
+  // テーブルをパースしてプレースホルダーに置換
+  function parseTablesWithPlaceholder(html, tables) {
+    const lines = html.split('\n');
+    const result = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      if (line.match(/^\|.+\|$/)) {
+        if (i + 1 < lines.length && lines[i + 1].match(/^\|[\s\-:|]+\|$/)) {
+          const tableLines = [];
+          while (i < lines.length && lines[i].match(/^\|.+\|$/)) {
+            tableLines.push(lines[i]);
+            i++;
+          }
+          const placeholder = `___TABLE_${tables.length}___`;
+          tables.push(buildTable(tableLines));
+          result.push(placeholder);
+          continue;
+        }
+      }
+      result.push(line);
+      i++;
+    }
+    return result.join('\n');
+  }
+
+  // テーブル行からHTMLを構築
+  function buildTable(lines) {
+    if (lines.length < 2) return lines.join('\n');
+    const headerLine = lines[0];
+    const separatorLine = lines[1];
+    const bodyLines = lines.slice(2);
+
+    function extractCells(line) {
+      return line.slice(1, -1).split('|').map(c => c.trim());
+    }
+
+    const alignments = extractCells(separatorLine).map(cell => {
+      const left = cell.startsWith(':');
+      const right = cell.endsWith(':');
+      if (left && right) return 'center';
+      if (right) return 'right';
+      return 'left';
+    });
+
+    function processInline(text) {
+      let r = escHtml(text);
+      r = r.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      r = r.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      r = r.replace(/`([^`]+)`/g, '<code>$1</code>');
+      return r;
+    }
+
+    const headerCells = extractCells(headerLine);
+    let t = '<table>\n<thead>\n<tr>';
+    headerCells.forEach((cell, idx) => {
+      const align = alignments[idx] || 'left';
+      t += `<th style="text-align:${align}">${processInline(cell)}</th>`;
+    });
+    t += '</tr>\n</thead>\n<tbody>';
+    for (const bodyLine of bodyLines) {
+      const cells = extractCells(bodyLine);
+      t += '\n<tr>';
+      cells.forEach((cell, idx) => {
+        const align = alignments[idx] || 'left';
+        t += `<td style="text-align:${align}">${processInline(cell)}</td>`;
+      });
+      t += '</tr>';
+    }
+    t += '\n</tbody>\n</table>';
+    return t;
+  }
+
+  // ネストされたリストをパース
+  function parseNestedLists(html) {
+    const lines = html.split('\n');
+    const result = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      const ulMatch = line.match(/^(\s*)[-*] (.+)$/);
+      const olMatch = line.match(/^(\s*)(\d+)\. (.+)$/);
+      if (ulMatch || olMatch) {
+        const listLines = [];
+        while (i < lines.length) {
+          const cl = lines[i];
+          if (cl.match(/^(\s*)[-*] (.+)$/) || cl.match(/^(\s*)(\d+)\. (.+)$/)) {
+            listLines.push(cl);
+            i++;
+          } else if (cl.trim() === '') {
+            break;
+          } else {
+            break;
+          }
+        }
+        result.push(buildNestedList(listLines));
+      } else {
+        result.push(line);
+        i++;
+      }
+    }
+    return result.join('\n');
+  }
+
+  // リスト行からネストHTMLを構築
+  function buildNestedList(lines) {
+    if (lines.length === 0) return '';
+
+    function getIndent(line) {
+      const m = line.match(/^(\s*)/);
+      if (!m) return 0;
+      return Math.floor(m[1].replace(/\t/g, '  ').length / 2);
+    }
+
+    function parseLine(line) {
+      const ulM = line.match(/^\s*[-*] (.+)$/);
+      const olM = line.match(/^\s*(\d+)\. (.+)$/);
+      if (ulM) return { type: 'ul', content: ulM[1] };
+      if (olM) return { type: 'ol', content: olM[2] };
+      return null;
+    }
+
+    // チェックボックス処理
+    function processCheckbox(content) {
+      if (content.startsWith('[x] ') || content.startsWith('[X] '))
+        return `<input type="checkbox" checked disabled> <span>${content.slice(4)}</span>`;
+      if (content.startsWith('[ ] '))
+        return `<input type="checkbox" disabled> <span>${content.slice(4)}</span>`;
+      return content;
+    }
+
+    let out = '';
+    const stack = [];
+    for (const line of lines) {
+      const indent = getIndent(line);
+      const parsed = parseLine(line);
+      if (!parsed) continue;
+      const display = processCheckbox(parsed.content);
+      while (stack.length > 0 && stack[stack.length - 1].indent > indent) {
+        const popped = stack.pop();
+        out += `</li></${popped.type}>`;
+      }
+      if (stack.length === 0) {
+        out += `<${parsed.type}><li>${display}`;
+        stack.push({ type: parsed.type, indent });
+      } else if (stack[stack.length - 1].indent === indent) {
+        out += `</li><li>${display}`;
+      } else if (stack[stack.length - 1].indent < indent) {
+        out += `<${parsed.type}><li>${display}`;
+        stack.push({ type: parsed.type, indent });
+      }
+    }
+    while (stack.length > 0) {
+      const popped = stack.pop();
+      out += `</li></${popped.type}>`;
+    }
+    return out;
+  }
+
   // --- ダッシュボード ---
   async function renderDashboard() {
     const c = document.getElementById('content');
     c.innerHTML = '<div class="loading">Loading...</div>';
     try {
-      const data = await apiFetch(repoParams({ action: 'commits' }));
+      const [data, readmeData] = await Promise.all([
+        apiFetch(repoParams({ action: 'commits' })),
+        apiFetch(repoParams({ action: 'readme' }))
+      ]);
       const latest = data.commits[0] || {};
       const visLabel = currentVisibility === 'private'
         ? '<span class="badge badge-private">private</span>'
         : '<span class="badge badge-public">public</span>';
       const cloneUrl = getCloneUrl();
+      const readmeHtml = readmeData.readme
+        ? `<div class="readme-box">
+            <div class="readme-header">📄 ${escHtml(readmeData.filename)}</div>
+            <div class="readme-body">${parseMarkdown(readmeData.readme)}</div>
+           </div>`
+        : '';
       c.innerHTML = `
         <div class="repo-title">
           <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}
@@ -440,9 +753,10 @@
           </div>
         </div>
         <div style="margin-top:20px;">
-          <h3 style="color:var(--muted);font-size:13px;margin-bottom:12px;">LATEST COMMITS</h3>
-          ${data.commits.slice(0, 5).map(renderCommitCard).join('')}
-        </div>`;
+          <h3 style="color:var(--muted);font-size:13px;margin-bottom:12px;">LATEST COMMIT</h3>
+          ${data.commits.slice(0, 1).map(renderCommitCard).join('')}
+        </div>
+        ${readmeHtml}`;
     } catch (e) {
       c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
     }

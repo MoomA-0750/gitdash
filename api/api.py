@@ -184,6 +184,22 @@ def get_tree(repo, f='', hb='HEAD', visibility='public', owner=None):
                     files.append({'type': 'tree', 'name': name, 'path': path})
         return {'repo': repo, 'path': f, 'files': files}
 
+def get_readme(repo, visibility, owner):
+    """リポジトリのREADME.mdを取得"""
+    if visibility == 'private':
+        repo_path = os.path.join(PRIVATE_ROOT, owner, repo)
+    else:
+        repo_path = os.path.join(PUBLIC_ROOT, repo)
+    # README候補ファイル名
+    for name in ['README.md', 'readme.md', 'Readme.md']:
+        result = subprocess.run(
+            ['git', '-C', repo_path, 'show', f'HEAD:{name}'],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            return {'repo': repo, 'readme': result.stdout, 'filename': name}
+    return {'repo': repo, 'readme': '', 'filename': ''}
+
 def main():
     qs = os.environ.get('QUERY_STRING', '')
     params = urllib.parse.parse_qs(qs)
@@ -209,6 +225,7 @@ def main():
         elif action == 'commits': send_json(get_commits(repo, visibility, owner))
         elif action == 'diff':    send_json(get_diff(repo, h, visibility, owner))
         elif action == 'tree':    send_json(get_tree(repo, f, hb, visibility, owner))
+        elif action == 'readme':  send_json(get_readme(repo, visibility, owner))
         else: send_json({'error': 'unknown action'}, 400)
     except Exception as e:
         send_json({'error': str(e)}, 500)
