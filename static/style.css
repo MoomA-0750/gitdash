@@ -191,6 +191,10 @@ code {
   margin: 12px 0 6px;
 }
 
+.section-label-shared {
+  color: #58a6ff;
+}
+
 .repo-item {
   padding: 7px 10px;
   border-radius: 6px;
@@ -225,6 +229,11 @@ code {
 .badge-public {
   background: rgba(46, 164, 79, 0.15);
   color: var(--accent);
+}
+
+.badge-shared {
+  background: rgba(88, 166, 255, 0.15);
+  color: #58a6ff;
 }
 
 /* メイン */
@@ -922,6 +931,78 @@ code {
 }
 
 .btn-delete-repo:hover {
+  background: var(--red);
+  color: #fff;
+}
+
+/* 共有管理パネル */
+.shared-panel {
+  margin-top: 28px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.shared-panel-title {
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.shared-user-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.shared-user-item:last-child {
+  border-bottom: none;
+}
+
+.shared-user-name {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.shared-empty {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 4px 0;
+}
+
+.shared-add-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.shared-add-row input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.btn-remove-shared {
+  background: none;
+  border: 1px solid var(--red);
+  color: var(--red);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-remove-shared:hover {
   background: var(--red);
   color: #fff;
 }

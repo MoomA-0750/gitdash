@@ -81,14 +81,17 @@ async function handleApi(req, res, params) {
   const visibility = params.get('visibility') || 'public';
   const owner      = params.get('owner') || '';
 
-  // プライベートリポジトリの認証チェック
+  // プライベートリポジトリの認証チェック（オーナーまたは共有ユーザーのみ）
   if (visibility === 'private') {
     const username = await getCurrentUser(req);
     if (!username) {
       return sendError(res, 'Unauthorized', 401);
     }
     if (username !== owner) {
-      return sendError(res, 'Forbidden', 403);
+      const sharedUsers = git.getRepoShared(repo, visibility, owner);
+      if (!sharedUsers.includes(username)) {
+        return sendError(res, 'Forbidden', 403);
+      }
     }
   }
 
@@ -176,6 +179,36 @@ async function handleApi(req, res, params) {
         }
 
         const result = git.changeVisibility(repoName, repoVisibility, actualOwner, newVisibility);
+        sendJson(res, result);
+        break;
+      }
+      case 'get_shared': {
+        // アクセス権のあるユーザーなら共有一覧を取得可能（認証チェックは上部で済み）
+        const sharedUsers = git.getRepoShared(repo, visibility, owner);
+        sendJson(res, { sharedWith: sharedUsers });
+        break;
+      }
+      case 'set_shared': {
+        // 認証必須・オーナーのみ
+        const username = await getCurrentUser(req);
+        if (!username) {
+          return sendError(res, 'ログインが必要です', 401);
+        }
+        const body = await readBody(req);
+        const repoName = body.repoName || '';
+        const repoVisibility = body.visibility || 'public';
+        const repoOwner = body.owner || '';
+        const sharedUsers = Array.isArray(body.sharedUsers) ? body.sharedUsers : [];
+
+        const actualOwner = git.getRepoOwner(repoName, repoVisibility, repoOwner);
+        if (!actualOwner) {
+          return sendError(res, 'このリポジトリのオーナー情報がありません', 403);
+        }
+        if (actualOwner !== username) {
+          return sendError(res, 'リポジトリのオーナーのみ共有設定を変更できます', 403);
+        }
+
+        const result = git.setRepoShared(repoName, repoVisibility, actualOwner, sharedUsers);
         sendJson(res, result);
         break;
       }

@@ -60,7 +60,7 @@ async function doLogin() {
       currentUsername = data.username;
       closeLogin();
       updateUserBar();
-      renderRepoList(data.repos);
+      renderRepoList(data.repos, data.sharedRepos || []);
     } else {
       document.getElementById('login-error').textContent = 'ユーザー名またはパスワードが違います';
       document.getElementById('login-error').style.display = 'block';
@@ -197,24 +197,113 @@ async function changeVisibility() {
   }
 }
 
+// --- 共有管理 ---
+async function renderSharedPanel() {
+  const panelId = 'shared-panel';
+  let panel = document.getElementById(panelId);
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = panelId;
+    panel.className = 'shared-panel';
+    document.getElementById('content').appendChild(panel);
+  }
+  panel.innerHTML = '<div class="loading" style="padding:8px;">Loading...</div>';
+
+  try {
+    const data = await apiFetch(repoParams({ action: 'get_shared' }));
+    const users = data.sharedWith || [];
+    const userItems = users.map(u => `
+      <div class="shared-user-item">
+        <span class="shared-user-name">👤 ${escHtml(u)}</span>
+        <button class="btn-remove-shared" onclick="removeSharedUser('${escHtml(u)}')">削除</button>
+      </div>`).join('');
+
+    panel.innerHTML = `
+      <h3 class="shared-panel-title">共有設定</h3>
+      <div id="shared-user-list">
+        ${users.length > 0 ? userItems : '<div class="shared-empty">共有ユーザーなし</div>'}
+      </div>
+      <div class="shared-add-row">
+        <input type="text" id="shared-add-input" placeholder="ユーザー名を入力" autocomplete="off">
+        <button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="addSharedUser()">追加</button>
+      </div>
+      <div id="shared-error" class="modal-error" style="display:none;margin-top:6px;"></div>`;
+  } catch (e) {
+    panel.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+  }
+}
+
+async function addSharedUser() {
+  const input = document.getElementById('shared-add-input');
+  const errEl = document.getElementById('shared-error');
+  const username = (input.value || '').trim();
+  if (!username) return;
+  if (username === currentOwner) {
+    errEl.textContent = 'オーナー自身は共有リストに追加できません';
+    errEl.style.display = 'block';
+    return;
+  }
+  try {
+    const data = await apiFetch(repoParams({ action: 'get_shared' }));
+    const users = data.sharedWith || [];
+    if (users.includes(username)) {
+      errEl.textContent = `${username} は既に共有されています`;
+      errEl.style.display = 'block';
+      return;
+    }
+    await apiPost('set_shared', {
+      repoName: currentRepo,
+      visibility: currentVisibility,
+      owner: currentOwner,
+      sharedUsers: [...users, username]
+    });
+    input.value = '';
+    errEl.style.display = 'none';
+    await renderSharedPanel();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+async function removeSharedUser(username) {
+  try {
+    const data = await apiFetch(repoParams({ action: 'get_shared' }));
+    const users = (data.sharedWith || []).filter(u => u !== username);
+    await apiPost('set_shared', {
+      repoName: currentRepo,
+      visibility: currentVisibility,
+      owner: currentOwner,
+      sharedUsers: users
+    });
+    await renderSharedPanel();
+    await loadRepos();
+  } catch (e) {
+    alert(`削除に失敗しました: ${e.message}`);
+  }
+}
+
 // --- リポジトリ一覧 ---
 async function loadRepos() {
   try {
     const data = await apiFetch({ action: 'repos' });
-    renderRepoList(data.repos);
+    renderRepoList(data.repos, data.sharedRepos || []);
   } catch (e) {
     document.getElementById('repo-list-public').innerHTML =
       `<div class="error" style="font-size:12px;">Error: ${e.message}</div>`;
   }
 }
 
-function renderRepoList(repos) {
-  const pubList  = document.getElementById('repo-list-public');
-  const privList = document.getElementById('repo-list-private');
-  const privSec  = document.getElementById('private-section');
+function renderRepoList(repos, sharedRepos = []) {
+  const pubList    = document.getElementById('repo-list-public');
+  const privList   = document.getElementById('repo-list-private');
+  const privSec    = document.getElementById('private-section');
+  const sharedList = document.getElementById('repo-list-shared');
+  const sharedSec  = document.getElementById('shared-section');
 
-  pubList.innerHTML  = '';
-  privList.innerHTML = '';
+  pubList.innerHTML    = '';
+  privList.innerHTML   = '';
+  if (sharedList) sharedList.innerHTML = '';
 
   const pubRepos  = repos.filter(r => r.visibility === 'public');
   const privRepos = repos.filter(r => r.visibility === 'private');
@@ -227,15 +316,26 @@ function renderRepoList(repos) {
   } else {
     privSec.style.display = 'none';
   }
+
+  if (sharedSec && sharedList) {
+    if (sharedRepos.length > 0) {
+      sharedSec.style.display = 'block';
+      sharedRepos.forEach(repo => sharedList.appendChild(makeRepoItem(repo, true)));
+    } else {
+      sharedSec.style.display = 'none';
+    }
+  }
 }
 
-function makeRepoItem(repo) {
+function makeRepoItem(repo, isShared = false) {
   const div = document.createElement('div');
   div.className = 'repo-item';
   const label = repo.name.replace('.git', '');
-  const badge = repo.visibility === 'private'
-    ? '<span class="badge badge-private">private</span>'
-    : '<span class="badge badge-public">public</span>';
+  const badge = isShared
+    ? '<span class="badge badge-shared">shared</span>'
+    : repo.visibility === 'private'
+      ? '<span class="badge badge-private">private</span>'
+      : '<span class="badge badge-public">public</span>';
   div.innerHTML = `<span>${escHtml(label)}</span>${badge}`;
   div.onclick = () => selectRepo(repo, div);
   return div;
@@ -352,6 +452,10 @@ git remote add origin ${escHtml(cloneUrl)}
 git push -u origin main</pre>
           </div>
         </div>`;
+      // 空リポジトリでもオーナーは共有管理パネルを表示
+      if (currentUsername && currentUsername === currentOwner) {
+        await renderSharedPanel();
+      }
       return;
     }
 
@@ -395,6 +499,11 @@ git push -u origin main</pre>
         ${data.commits.slice(0, 1).map(renderCommitCard).join('')}
       </div>
       ${readmeHtml}`;
+
+    // オーナーのみ共有管理パネルを表示
+    if (currentUsername && currentUsername === currentOwner) {
+      await renderSharedPanel();
+    }
   } catch (e) {
     c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
   }
