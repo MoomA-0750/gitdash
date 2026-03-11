@@ -148,6 +148,32 @@ async function doCreateRepo() {
   }
 }
 
+// --- リポジトリ削除 ---
+async function deleteRepo() {
+  const repoLabel = currentRepo.replace('.git', '');
+  const input = prompt(`リポジトリ「${repoLabel}」を削除します。\n確認のためリポジトリ名を入力してください:`);
+  if (input === null) return; // キャンセル
+  if (input.trim() !== repoLabel) {
+    alert('リポジトリ名が一致しません。削除をキャンセルしました。');
+    return;
+  }
+  try {
+    await apiPost('delete_repo', {
+      repoName: currentRepo,
+      visibility: currentVisibility,
+      owner: currentOwner
+    });
+    currentRepo = null;
+    currentOwner = null;
+    currentVisibility = 'public';
+    document.getElementById('content').innerHTML =
+      '<div class="loading">リポジトリを選択してください</div>';
+    await loadRepos();
+  } catch (e) {
+    alert(`削除に失敗しました: ${e.message}`);
+  }
+}
+
 // --- リポジトリ一覧 ---
 async function loadRepos() {
   try {
@@ -271,6 +297,9 @@ async function renderDashboard() {
       c.innerHTML = `
         <div class="repo-title">
           <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}
+          ${currentUsername && currentUsername === currentOwner
+            ? '<button class="btn-delete-repo" onclick="deleteRepo()">リポジトリを削除</button>'
+            : ''}
         </div>
         <div class="clone-url-box">
           <span class="clone-label">Clone:</span>
@@ -310,6 +339,9 @@ git push -u origin main</pre>
     c.innerHTML = `
       <div class="repo-title">
         <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}
+        ${currentUsername && currentUsername === currentOwner
+          ? '<button class="btn-delete-repo" onclick="deleteRepo()">リポジトリを削除</button>'
+          : ''}
       </div>
       <div class="clone-url-box">
         <span class="clone-label">Clone:</span>

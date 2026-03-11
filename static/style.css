@@ -885,6 +885,24 @@ code {
   font-size: 18px;
 }
 
+/* リポジトリ削除ボタン */
+.btn-delete-repo {
+  background: none;
+  border: 1px solid var(--red);
+  color: var(--red);
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.15s;
+}
+
+.btn-delete-repo:hover {
+  background: var(--red);
+  color: #fff;
+}
+
 /* クローンURL */
 .clone-url-box {
   display: flex;

@@ -149,6 +149,30 @@ async function handleApi(req, res, params) {
         sendJson(res, result);
         break;
       }
+      case 'delete_repo': {
+        // 認証必須
+        const username = await getCurrentUser(req);
+        if (!username) {
+          return sendError(res, 'ログインが必要です', 401);
+        }
+        const body = await readBody(req);
+        const repoName = body.repoName || '';
+        const repoVisibility = body.visibility || 'public';
+        const repoOwner = body.owner || '';
+
+        // ownerファイルを確認し、リクエストユーザーと一致するかチェック
+        const actualOwner = git.getRepoOwner(repoName, repoVisibility, repoOwner);
+        if (!actualOwner) {
+          return sendError(res, 'このリポジトリのオーナー情報がありません。削除できません。', 403);
+        }
+        if (actualOwner !== username) {
+          return sendError(res, 'リポジトリのオーナーのみ削除できます', 403);
+        }
+
+        const result = git.deleteRepo(repoName, repoVisibility, repoOwner);
+        sendJson(res, result);
+        break;
+      }
       default:
         sendError(res, 'unknown action', 400);
     }
