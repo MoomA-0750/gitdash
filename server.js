@@ -144,7 +144,7 @@ async function handleApi(req, res, params) {
         const repoName = body.repoName || '';
         const repoVisibility = body.visibility || 'public';
         const description = body.description || '';
-        const repoOwner = repoVisibility === 'private' ? username : null;
+        const repoOwner = username;
         const result = await git.createRepo(repoName, repoVisibility, repoOwner, description);
         sendJson(res, result);
         break;
