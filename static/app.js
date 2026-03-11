@@ -313,13 +313,16 @@ async function renderDashboard() {
     const visLabel = currentVisibility === 'private'
       ? '<span class="badge badge-private">private</span>'
       : '<span class="badge badge-public">public</span>';
+    const ownerLabel = currentOwner
+      ? `<span class="repo-owner">by ${escHtml(currentOwner)}</span>`
+      : '';
     const cloneUrl = getCloneUrl();
 
     // 空リポジトリの場合
     if (data.empty) {
       c.innerHTML = `
         <div class="repo-title">
-          <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}
+          <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}${ownerLabel}
           ${currentUsername && currentUsername === currentOwner
             ? `<button class="btn-change-visibility" onclick="changeVisibility()">${currentVisibility === 'public' ? 'privateに変更' : 'publicに変更'}</button>
                <button class="btn-delete-repo" onclick="deleteRepo()">リポジトリを削除</button>`
@@ -362,7 +365,7 @@ git push -u origin main</pre>
       : '';
     c.innerHTML = `
       <div class="repo-title">
-        <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}
+        <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}${ownerLabel}
         ${currentUsername && currentUsername === currentOwner
           ? `<button class="btn-change-visibility" onclick="changeVisibility()">${currentVisibility === 'public' ? 'privateに変更' : 'publicに変更'}</button>
              <button class="btn-delete-repo" onclick="deleteRepo()">リポジトリを削除</button>`

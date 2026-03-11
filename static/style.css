@@ -885,6 +885,11 @@ code {
   font-size: 18px;
 }
 
+.repo-owner {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 /* リポジトリ可視性変更ボタン */
 .btn-change-visibility {
   background: none;
