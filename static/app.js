@@ -531,7 +531,179 @@ function copyFileContent(btn) {
   }
 }
 
-// --- diff ---
+// --- diff (side-by-side) ---
+
+// unified diff をファイル単位に分割
+function parseDiffFiles(diffText) {
+  const lines = diffText.split('\n');
+  // コミットヘッダー（diff --git より前）を分離
+  let headerEnd = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('diff --git ')) { headerEnd = i; break; }
+    if (i === lines.length - 1) headerEnd = lines.length;
+  }
+  const commitHeader = lines.slice(0, headerEnd).join('\n');
+
+  // ファイル単位に分割
+  const files = [];
+  let current = null;
+  for (let i = headerEnd; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('diff --git ')) {
+      if (current) files.push(current);
+      // ファイル名を抽出（diff --git a/path b/path）
+      const m = line.match(/^diff --git a\/(.+) b\/(.+)$/);
+      const fileName = m ? m[2] : line;
+      current = { fileName, meta: [line], hunks: [] };
+    } else if (current && line.startsWith('@@')) {
+      // hunkヘッダーをパース: @@ -oldStart,oldLen +newStart,newLen @@
+      const hm = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/);
+      const oldStart = hm ? parseInt(hm[1]) : 1;
+      const newStart = hm ? parseInt(hm[3]) : 1;
+      current.hunks.push({ header: line, oldStart, newStart, lines: [] });
+    } else if (current && current.hunks.length > 0) {
+      current.hunks[current.hunks.length - 1].lines.push(line);
+    } else if (current) {
+      current.meta.push(line);
+    }
+  }
+  if (current) files.push(current);
+  return { commitHeader, files };
+}
+
+// hunkリストからside-by-side HTMLテーブル行を生成
+function buildSideBySide(hunks) {
+  let rows = '';
+  for (const hunk of hunks) {
+    // hunkヘッダー行
+    rows += `<tr class="diff-line-hunk">
+      <td class="diff-line-num"></td><td class="diff-line-content" colspan="1">${escHtml(hunk.header)}</td>
+      <td class="diff-line-num"></td><td class="diff-line-content" colspan="1">${escHtml(hunk.header)}</td>
+    </tr>`;
+
+    let oldNum = hunk.oldStart;
+    let newNum = hunk.newStart;
+
+    // 行をグループに分けて処理（-と+の連続をペアリング）
+    const hLines = hunk.lines;
+    let i = 0;
+    while (i < hLines.length) {
+      const line = hLines[i];
+      if (line.startsWith('-')) {
+        // 連続する - を収集
+        const dels = [];
+        while (i < hLines.length && hLines[i].startsWith('-')) {
+          dels.push(hLines[i].substring(1));
+          i++;
+        }
+        // 直後の連続する + を収集
+        const adds = [];
+        while (i < hLines.length && hLines[i].startsWith('+')) {
+          adds.push(hLines[i].substring(1));
+          i++;
+        }
+        // ペアリング
+        const maxLen = Math.max(dels.length, adds.length);
+        for (let j = 0; j < maxLen; j++) {
+          const hasDel = j < dels.length;
+          const hasAdd = j < adds.length;
+          rows += `<tr>
+            <td class="diff-line-num ${hasDel ? 'diff-num-del' : ''}">${hasDel ? oldNum++ : ''}</td>
+            <td class="diff-line-content ${hasDel ? 'diff-line-del' : ''}">${hasDel ? escHtml(dels[j]) : ''}</td>
+            <td class="diff-line-num ${hasAdd ? 'diff-num-add' : ''}">${hasAdd ? newNum++ : ''}</td>
+            <td class="diff-line-content ${hasAdd ? 'diff-line-add' : ''}">${hasAdd ? escHtml(adds[j]) : ''}</td>
+          </tr>`;
+        }
+      } else if (line.startsWith('+')) {
+        // 単独の + 行（前に - がないケース）
+        rows += `<tr>
+          <td class="diff-line-num"></td>
+          <td class="diff-line-content"></td>
+          <td class="diff-line-num diff-num-add">${newNum++}</td>
+          <td class="diff-line-content diff-line-add">${escHtml(line.substring(1))}</td>
+        </tr>`;
+        i++;
+      } else if (line.startsWith('\\')) {
+        // "\ No newline at end of file" 等
+        i++;
+      } else {
+        // コンテキスト行（スペース先頭 or 空行）
+        const content = line.startsWith(' ') ? line.substring(1) : line;
+        rows += `<tr>
+          <td class="diff-line-num">${oldNum++}</td>
+          <td class="diff-line-content">${escHtml(content)}</td>
+          <td class="diff-line-num">${newNum++}</td>
+          <td class="diff-line-content">${escHtml(content)}</td>
+        </tr>`;
+        i++;
+      }
+    }
+  }
+  return rows;
+}
+
+// diff ファイルセクションの折りたたみ
+function toggleDiffFile(el) {
+  const body = el.nextElementSibling;
+  const arrow = el.querySelector('.diff-arrow');
+  if (body.style.display === 'none') {
+    body.style.display = '';
+    arrow.textContent = '▼';
+  } else {
+    body.style.display = 'none';
+    arrow.textContent = '▶';
+  }
+}
+
+// コミットヘッダーをパースして構造化HTMLに変換
+function parseCommitHeader(headerText) {
+  const lines = headerText.split('\n');
+  const info = { hash: '', author: '', authorDate: '', committer: '', commitDate: '', message: [] };
+  let inMessage = false;
+
+  for (const line of lines) {
+    if (line.startsWith('commit ')) {
+      info.hash = line.replace('commit ', '').trim();
+    } else if (line.startsWith('Author:')) {
+      info.author = line.replace('Author:', '').trim();
+    } else if (line.startsWith('AuthorDate:')) {
+      info.authorDate = line.replace('AuthorDate:', '').trim();
+    } else if (line.startsWith('Commit:')) {
+      info.committer = line.replace('Commit:', '').trim();
+    } else if (line.startsWith('CommitDate:')) {
+      info.commitDate = line.replace('CommitDate:', '').trim();
+      inMessage = true;
+    } else if (inMessage) {
+      // コミットメッセージ行（先頭スペースを除去）
+      info.message.push(line.replace(/^    /, ''));
+    }
+  }
+
+  // メッセージの前後の空行をトリム
+  while (info.message.length && !info.message[0].trim()) info.message.shift();
+  while (info.message.length && !info.message[info.message.length - 1].trim()) info.message.pop();
+
+  const title = info.message[0] || '';
+  const body = info.message.slice(1).join('\n').trim();
+  const shortHash = info.hash.substring(0, 10);
+
+  // 日付を整形
+  const dateStr = info.authorDate ? new Date(info.authorDate).toLocaleString('ja-JP') : info.authorDate;
+
+  let html = `<div class="diff-commit-card">
+    <div class="diff-commit-title">${escHtml(title)}</div>`;
+  if (body) {
+    html += `<pre class="diff-commit-body">${escHtml(body)}</pre>`;
+  }
+  html += `<div class="diff-commit-meta">
+      <span class="diff-commit-hash">${escHtml(shortHash)}</span>
+      <span class="diff-commit-author">${escHtml(info.author)}</span>
+      <span class="diff-commit-date">${escHtml(dateStr)}</span>
+    </div>
+  </div>`;
+  return html;
+}
+
 async function renderDiff(h = '') {
   const c = document.getElementById('content');
   if (!h) {
@@ -541,13 +713,37 @@ async function renderDiff(h = '') {
   c.innerHTML = '<div class="loading">Loading diff...</div>';
   try {
     const data = await apiFetch(repoParams({ action: 'diff', h }));
-    const lines = data.diff.split('\n').map(line => {
-      if (line.startsWith('+')) return `<span class="diff-add">${escHtml(line)}</span>`;
-      if (line.startsWith('-')) return `<span class="diff-del">${escHtml(line)}</span>`;
-      if (line.startsWith('@@')) return `<span class="diff-hunk">${escHtml(line)}</span>`;
-      return escHtml(line);
-    }).join('\n');
-    c.innerHTML = `<pre class="diff">${lines}</pre>`;
+    const { commitHeader, files } = parseDiffFiles(data.diff);
+
+    let html = `<div class="diff-container">`;
+
+    // コミットヘッダーを構造化表示
+    if (commitHeader.trim()) {
+      html += parseCommitHeader(commitHeader);
+    }
+
+    // 変更ファイル数サマリー
+    if (files.length > 0) {
+      html += `<div class="diff-summary">${files.length} files changed</div>`;
+    }
+
+    // ファイル別 side-by-side diff
+    for (const file of files) {
+      const rows = buildSideBySide(file.hunks);
+      html += `
+        <div class="diff-file">
+          <div class="diff-file-header" onclick="toggleDiffFile(this)">
+            <span class="diff-arrow">▼</span>
+            <span class="diff-file-name">${escHtml(file.fileName)}</span>
+          </div>
+          <div class="diff-file-body">
+            <table class="diff-table"><tbody>${rows}</tbody></table>
+          </div>
+        </div>`;
+    }
+
+    html += `</div>`;
+    c.innerHTML = html;
   } catch (e) {
     c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
   }

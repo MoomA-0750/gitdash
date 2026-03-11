@@ -283,28 +283,172 @@ code {
   text-decoration: underline;
 }
 
-/* diff */
-pre.diff {
+/* diff (side-by-side) */
+.diff-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.diff-commit-card {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+}
+
+.diff-commit-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.diff-commit-body {
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 16px;
-  overflow-x: auto;
+  padding: 12px 16px;
   font-family: monospace;
   font-size: 12px;
   line-height: 1.5;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 12px;
 }
 
-.diff-add {
+.diff-commit-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.diff-commit-hash {
+  font-family: monospace;
+  color: var(--blue);
+  background: rgba(88, 166, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.diff-commit-author {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.diff-commit-date {
+  color: var(--muted);
+}
+
+.diff-summary {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 4px 0;
+}
+
+.diff-file {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.diff-file-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.diff-file-header:hover {
+  background: var(--border);
+}
+
+.diff-arrow {
+  font-size: 10px;
+  color: var(--muted);
+  width: 14px;
+}
+
+.diff-file-name {
+  font-family: monospace;
+  color: var(--blue);
+}
+
+.diff-file-body {
+  overflow-x: auto;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  table-layout: fixed;
+}
+
+.diff-table td {
+  vertical-align: top;
+  white-space: pre;
+}
+
+.diff-line-num {
+  width: 48px;
+  min-width: 48px;
+  text-align: right;
+  padding: 0 8px;
+  color: var(--muted);
+  user-select: none;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.diff-line-content {
+  padding: 0 12px;
+  overflow-x: auto;
+}
+
+/* 左右を区切る中央のボーダー */
+.diff-table td:nth-child(2) {
+  border-right: 1px solid var(--border);
+}
+
+/* 追加行 */
+.diff-line-add {
+  background: rgba(63, 185, 80, 0.12);
   color: #3fb950;
 }
 
-.diff-del {
+.diff-num-add {
+  background: rgba(63, 185, 80, 0.08);
+}
+
+/* 削除行 */
+.diff-line-del {
+  background: rgba(248, 81, 73, 0.12);
   color: var(--red);
 }
 
-.diff-hunk {
+.diff-num-del {
+  background: rgba(248, 81, 73, 0.08);
+}
+
+/* hunkヘッダー行 */
+.diff-line-hunk td {
+  background: rgba(88, 166, 255, 0.08);
   color: var(--blue);
+  font-size: 11px;
+  padding: 4px 12px;
 }
 
 /* ファイルツリー */
