@@ -174,6 +174,29 @@ async function deleteRepo() {
   }
 }
 
+// --- リポジトリ可視性変更 ---
+async function changeVisibility() {
+  const newVis = currentVisibility === 'public' ? 'private' : 'public';
+  const repoLabel = currentRepo.replace('.git', '');
+  const msg = currentVisibility === 'public'
+    ? `リポジトリ「${repoLabel}」を private に変更します。\n他のユーザーからアクセスできなくなります。よろしいですか？`
+    : `リポジトリ「${repoLabel}」を public に変更します。\n全てのユーザーがアクセスできるようになります。よろしいですか？`;
+  if (!confirm(msg)) return;
+  try {
+    await apiPost('change_visibility', {
+      repoName: currentRepo,
+      visibility: currentVisibility,
+      owner: currentOwner,
+      newVisibility: newVis
+    });
+    currentVisibility = newVis;
+    await loadRepos();
+    renderDashboard();
+  } catch (e) {
+    alert(`可視性の変更に失敗しました: ${e.message}`);
+  }
+}
+
 // --- リポジトリ一覧 ---
 async function loadRepos() {
   try {
@@ -298,7 +321,8 @@ async function renderDashboard() {
         <div class="repo-title">
           <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}
           ${currentUsername && currentUsername === currentOwner
-            ? '<button class="btn-delete-repo" onclick="deleteRepo()">リポジトリを削除</button>'
+            ? `<button class="btn-change-visibility" onclick="changeVisibility()">${currentVisibility === 'public' ? 'privateに変更' : 'publicに変更'}</button>
+               <button class="btn-delete-repo" onclick="deleteRepo()">リポジトリを削除</button>`
             : ''}
         </div>
         <div class="clone-url-box">
@@ -340,7 +364,8 @@ git push -u origin main</pre>
       <div class="repo-title">
         <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}
         ${currentUsername && currentUsername === currentOwner
-          ? '<button class="btn-delete-repo" onclick="deleteRepo()">リポジトリを削除</button>'
+          ? `<button class="btn-change-visibility" onclick="changeVisibility()">${currentVisibility === 'public' ? 'privateに変更' : 'publicに変更'}</button>
+             <button class="btn-delete-repo" onclick="deleteRepo()">リポジトリを削除</button>`
           : ''}
       </div>
       <div class="clone-url-box">

@@ -885,6 +885,24 @@ code {
   font-size: 18px;
 }
 
+/* リポジトリ可視性変更ボタン */
+.btn-change-visibility {
+  background: none;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.15s;
+}
+
+.btn-change-visibility:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* リポジトリ削除ボタン */
 .btn-delete-repo {
   background: none;
@@ -894,7 +912,7 @@ code {
   padding: 4px 12px;
   border-radius: 6px;
   cursor: pointer;
-  margin-left: auto;
+  margin-left: 8px;
   transition: all 0.15s;
 }
 

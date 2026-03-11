@@ -150,6 +150,35 @@ async function handleApi(req, res, params) {
         sendJson(res, result);
         break;
       }
+      case 'change_visibility': {
+        // 認証必須
+        const username = await getCurrentUser(req);
+        if (!username) {
+          return sendError(res, 'ログインが必要です', 401);
+        }
+        const body = await readBody(req);
+        const repoName = body.repoName || '';
+        const repoVisibility = body.visibility || 'public';
+        const repoOwner = body.owner || '';
+        const newVisibility = body.newVisibility || '';
+
+        if (!newVisibility) {
+          return sendError(res, '新しい可視性を指定してください', 400);
+        }
+
+        // ownerファイルを確認し、リクエストユーザーと一致するかチェック
+        const actualOwner = git.getRepoOwner(repoName, repoVisibility, repoOwner);
+        if (!actualOwner) {
+          return sendError(res, 'このリポジトリのオーナー情報がありません', 403);
+        }
+        if (actualOwner !== username) {
+          return sendError(res, 'リポジトリのオーナーのみ変更できます', 403);
+        }
+
+        const result = git.changeVisibility(repoName, repoVisibility, actualOwner, newVisibility);
+        sendJson(res, result);
+        break;
+      }
       case 'delete_repo': {
         // 認証必須
         const username = await getCurrentUser(req);
