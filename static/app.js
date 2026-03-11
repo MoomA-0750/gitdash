@@ -1,4 +1,4 @@
-const API = '/api';
+const API = (window.BASE_PATH || '') + '/api';
 let currentRepo = null;
 let currentVisibility = 'public';
 let currentOwner = null;

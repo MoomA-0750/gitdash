@@ -7,7 +7,8 @@ const git = require('./lib/git');
 const { parseMarkdown } = require('./lib/markdown');
 const { highlightCode } = require('./lib/syntax-highlight');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5987;
+const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/$/, '');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -190,22 +191,26 @@ const server = http.createServer(async (req, res) => {
 
   try {
     // API
-    if (pathname === '/api' || pathname === '/api/') {
+    if (pathname === BASE_PATH + '/api' || pathname === BASE_PATH + '/api/') {
       await handleApi(req, res, params);
       return;
     }
 
     // 静的ファイル
-    if (pathname.startsWith('/static/')) {
-      const safePath = path.normalize(pathname).replace(/^(\.\.(\/|\\|$))+/, '');
+    if (pathname.startsWith(BASE_PATH + '/static/')) {
+      const stripped = pathname.slice(BASE_PATH.length);
+      const safePath = path.normalize(stripped).replace(/^(\.\.(\/|\\|$))+/, '');
       const filePath = path.join(__dirname, safePath);
       serveStatic(req, res, filePath);
       return;
     }
 
     // ダッシュボード（ルート）
-    if (pathname === '/' || pathname === '/index.html') {
-      serveStatic(req, res, path.join(__dirname, 'dashboard', 'index.html'));
+    if (pathname === BASE_PATH + '/' || pathname === BASE_PATH + '/index.html' || pathname === BASE_PATH) {
+      let html = fs.readFileSync(path.join(__dirname, 'dashboard', 'index.html'), 'utf8');
+      html = html.replace('__BASE_PATH__', BASE_PATH);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
+      res.end(html);
       return;
     }
 
@@ -219,6 +224,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`Git Dashboard server running on http://localhost:${PORT}`);
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`Git Dashboard server running on http://127.0.0.1:${PORT}${BASE_PATH || '/'}`);
 });

@@ -6,10 +6,6 @@ SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== Git Dashboard デプロイ ==="
 
-# Python CGI（段階的移行のため当面残す）
-sudo cp api/api.py /var/www/gitapi/api.py
-sudo chmod 755 /var/www/gitapi/api.py
-
 # Apache 設定
 sudo cp apache/gitweb.conf /etc/httpd/conf.d/gitweb.conf
 sudo cp apache/gitweb.app.conf /etc/gitweb.conf
@@ -34,7 +30,7 @@ if systemctl is-active --quiet gitdash 2>/dev/null; then
   sudo systemctl restart gitdash
 else
   echo "NOTE: gitdash systemd サービスが未設定です"
-  echo "  手動起動: cd ${DEPLOY_DIR} && node server.js"
+  echo "  手動起動: cd ${DEPLOY_DIR} && BASE_PATH=/gitdash PORT=5987 node server.js"
   echo "  systemd 設定例:"
   echo "    sudo tee /etc/systemd/system/gitdash.service <<EOF"
   echo "[Unit]"
@@ -46,7 +42,8 @@ else
   echo "WorkingDirectory=${DEPLOY_DIR}"
   echo "ExecStart=/usr/bin/node ${DEPLOY_DIR}/server.js"
   echo "Restart=on-failure"
-  echo "Environment=PORT=3000"
+  echo "Environment=PORT=5987"
+  echo "Environment=BASE_PATH=/gitdash"
   echo ""
   echo "[Install]"
   echo "WantedBy=multi-user.target"
