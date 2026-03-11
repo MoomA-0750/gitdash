@@ -321,6 +321,193 @@ pre.diff {
   background: var(--surface);
 }
 
+.file-item-active {
+  background: var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* ファイルビューア（2カラム） */
+.file-viewer-container {
+  display: flex;
+  height: calc(100vh - 100px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.file-tree-panel {
+  width: 280px;
+  min-width: 200px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.file-tree-header {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.file-tree-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.file-tree-breadcrumb {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  word-break: break-all;
+}
+
+.file-tree-panel .file-item {
+  border-bottom: 1px solid rgba(48, 54, 61, 0.3);
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+/* 右パネル: ファイル内容 */
+.file-content-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.file-content-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.file-content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.file-content-filename {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.file-content-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.file-content-size {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.file-copy-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+}
+
+.file-content-body {
+  flex: 1;
+  overflow: auto;
+}
+
+.file-binary-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* コードビューア（行番号付き） */
+.code-viewer {
+  display: flex;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  min-height: 100%;
+}
+
+.line-numbers {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+  text-align: right;
+  color: var(--muted);
+  user-select: none;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  min-width: 48px;
+}
+
+.line-numbers .line-number {
+  padding: 0 12px;
+  display: block;
+}
+
+.code-content {
+  flex: 1;
+  margin: 0;
+  padding: 12px 16px;
+  overflow-x: auto;
+  background: var(--bg);
+  border: none;
+  border-radius: 0;
+  white-space: pre;
+}
+
+.code-content code {
+  font-family: monospace;
+  font-size: 12px;
+  background: none;
+  padding: 0;
+}
+
+/* シンタックスハイライト（CodeMirrorトークン） */
+.cm-keyword { color: #ff7b72; }
+.cm-def { color: #d2a8ff; }
+.cm-variable { color: var(--text); }
+.cm-variable-2 { color: #79c0ff; }
+.cm-variable-3 { color: #7ee787; }
+.cm-property { color: #79c0ff; }
+.cm-operator { color: #ff7b72; }
+.cm-string { color: #a5d6ff; }
+.cm-string-2 { color: #a5d6ff; }
+.cm-number { color: #79c0ff; }
+.cm-atom { color: #79c0ff; }
+.cm-comment { color: #8b949e; font-style: italic; }
+.cm-meta { color: #d29922; }
+.cm-tag { color: #7ee787; }
+.cm-attribute { color: #79c0ff; }
+.cm-qualifier { color: #d2a8ff; }
+.cm-builtin { color: #ffa657; }
+.cm-type { color: #ffa657; }
+.cm-bracket { color: var(--text); }
+.cm-header { color: #79c0ff; font-weight: bold; }
+.cm-link { color: var(--blue); }
+
 /* ダッシュボード */
 .stats {
   display: grid;

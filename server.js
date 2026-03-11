@@ -5,6 +5,7 @@ const url = require('url');
 const { getCurrentUser } = require('./lib/auth');
 const git = require('./lib/git');
 const { parseMarkdown } = require('./lib/markdown');
+const { highlightCode } = require('./lib/syntax-highlight');
 
 const PORT = process.env.PORT || 3000;
 
@@ -45,7 +46,10 @@ function serveStatic(req, res, filePath) {
       res.end('Not Found');
       return;
     }
-    res.writeHead(200, { 'Content-Type': mime });
+    res.writeHead(200, {
+      'Content-Type': mime,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    });
     res.end(data);
   });
 }
@@ -103,6 +107,22 @@ async function handleApi(req, res, params) {
       case 'tree':
         sendJson(res, await git.getTree(repo, f, hb, visibility, owner));
         break;
+      case 'blob': {
+        const blobData = await git.getBlob(repo, f, hb, visibility, owner);
+        if (!blobData.binary && !blobData.error && !blobData.truncated && !blobData.empty && blobData.content) {
+          const ext = (f || '').split('.').pop().toLowerCase();
+          if (ext === 'md' || ext === 'markdown') {
+            blobData.contentHtml = await parseMarkdown(blobData.content);
+            blobData.renderMode = 'markdown';
+          } else {
+            blobData.highlightedHtml = await highlightCode(blobData.content, ext);
+            blobData.renderMode = 'code';
+            blobData.language = ext;
+          }
+        }
+        sendJson(res, blobData);
+        break;
+      }
       case 'readme': {
         const readmeData = await git.getReadme(repo, visibility, owner);
         // サーバーサイドでマークダウンをHTMLに変換

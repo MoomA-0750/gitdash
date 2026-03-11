@@ -3,6 +3,7 @@ let currentRepo = null;
 let currentVisibility = 'public';
 let currentOwner = null;
 let currentTab = 'dashboard';
+let currentFilePath = '';
 let authHeader = null;
 let currentUsername = null;
 
@@ -368,36 +369,165 @@ async function renderCommits() {
   }
 }
 
-// --- ファイルツリー ---
-async function renderFiles(filePath = '') {
+// --- ファイルビューア（2カラム） ---
+async function renderFiles() {
   const c = document.getElementById('content');
-  c.innerHTML = '<div class="loading">Loading...</div>';
+  currentFilePath = '';
+
+  c.innerHTML = `
+    <div class="file-viewer-container">
+      <div class="file-tree-panel" id="file-tree-panel">
+        <div class="file-tree-header">Files</div>
+        <div class="file-tree-content" id="file-tree-content">
+          <div class="loading" style="padding:12px;">Loading...</div>
+        </div>
+      </div>
+      <div class="file-content-panel" id="file-content-panel">
+        <div class="file-content-placeholder">
+          <span>ファイルを選択してください</span>
+        </div>
+      </div>
+    </div>`;
+
+  await loadFileTree('');
+}
+
+async function loadFileTree(filePath) {
+  const treeContent = document.getElementById('file-tree-content');
+  if (!treeContent) return;
+  treeContent.innerHTML = '<div class="loading" style="padding:12px;">Loading...</div>';
+
   try {
     const data = await apiFetch(repoParams({ action: 'tree', f: filePath }));
     if (data.empty) {
-      c.innerHTML = '<div class="loading">空のリポジトリです — ファイルがありません</div>';
+      treeContent.innerHTML = '<div class="loading" style="padding:12px;">空のリポジトリです</div>';
       return;
     }
+
     const breadcrumb = filePath
-      ? `<div style="margin-bottom:12px;color:var(--muted);font-size:12px;">📁 ${escHtml(filePath)}</div>`
+      ? `<div class="file-tree-breadcrumb">📁 ${escHtml(filePath)}</div>`
       : '';
+
     const back = filePath
-      ? `<div class="file-item" onclick="renderFiles('${escHtml(filePath.split('/').slice(0,-1).join('/'))}')">
+      ? `<div class="file-item" onclick="loadFileTree('${escHtml(filePath.split('/').slice(0,-1).join('/'))}')">
            <span>📁</span> ..</div>`
       : '';
+
     const items = data.files.map(f => {
       const icon = f.type === 'tree' ? '📁' : '📄';
       const onclick = f.type === 'tree'
-        ? `renderFiles('${escHtml(f.path)}')`
-        : currentVisibility === 'private'
-          ? `alert('ファイル内容の表示は /gitweb/ では非対応（プライベートリポジトリ）')`
-          : `window.open('/gitweb/?p=${encodeURIComponent(currentRepo)}&a=blob&f=${encodeURIComponent(f.path)}&hb=HEAD')`;
-      return `<div class="file-item" onclick="${onclick}">
+        ? `loadFileTree('${escHtml(f.path)}')`
+        : `loadFileContent('${escHtml(f.path)}')`;
+      const activeClass = (f.type !== 'tree' && f.path === currentFilePath) ? ' file-item-active' : '';
+      return `<div class="file-item${activeClass}" onclick="${onclick}">
         <span>${icon}</span>${escHtml(f.name)}</div>`;
     }).join('');
-    c.innerHTML = breadcrumb + '<div>' + back + items + '</div>';
+
+    treeContent.innerHTML = breadcrumb + back + items;
   } catch (e) {
-    c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+    treeContent.innerHTML = `<div class="error" style="padding:12px;">Error: ${e.message}</div>`;
+  }
+}
+
+async function loadFileContent(filePath) {
+  currentFilePath = filePath;
+  const contentPanel = document.getElementById('file-content-panel');
+  if (!contentPanel) return;
+  contentPanel.innerHTML = '<div class="loading">Loading...</div>';
+
+  // 選択中ファイルをハイライト
+  document.querySelectorAll('#file-tree-content .file-item').forEach(item => {
+    item.classList.toggle('file-item-active',
+      item.textContent.trim().replace(/^[📁📄]\s*/, '') === filePath.split('/').pop());
+  });
+
+  try {
+    const data = await apiFetch(repoParams({ action: 'blob', f: filePath, hb: 'HEAD' }));
+    const fileName = filePath.split('/').pop();
+
+    // サイズ表示
+    const sizeLabel = data.size
+      ? (data.size > 1024 ? `${(data.size / 1024).toFixed(1)} KB` : `${data.size} B`)
+      : '';
+
+    const headerHtml = `
+      <div class="file-content-header">
+        <div class="file-content-filename">📄 ${escHtml(fileName)}</div>
+        <div class="file-content-meta">
+          <span class="file-content-size">${sizeLabel}</span>
+          ${!data.binary && !data.error && !data.truncated && data.content
+            ? '<button class="btn-copy file-copy-btn" onclick="copyFileContent(this)">Copy</button>'
+            : ''}
+        </div>
+      </div>`;
+
+    if (data.error) {
+      contentPanel.innerHTML = headerHtml +
+        `<div class="file-content-body"><div class="error" style="margin:16px;">${escHtml(data.error)}</div></div>`;
+    } else if (data.binary) {
+      contentPanel.innerHTML = headerHtml +
+        `<div class="file-content-body">
+          <div class="file-binary-message">バイナリファイルは表示できません (${sizeLabel})</div>
+        </div>`;
+    } else if (data.truncated) {
+      contentPanel.innerHTML = headerHtml +
+        `<div class="file-content-body">
+          <div class="file-binary-message">ファイルが大きすぎます (${sizeLabel})</div>
+        </div>`;
+    } else if (data.renderMode === 'markdown') {
+      contentPanel.innerHTML = headerHtml +
+        `<div class="file-content-body">
+          <div class="readme-body" style="padding:20px 24px;">${data.contentHtml}</div>
+        </div>`;
+      contentPanel.dataset.rawContent = data.content;
+    } else {
+      // コード表示（行番号付き）
+      const lines = data.content.split('\n');
+      const lineNums = lines.map((_, i) =>
+        `<span class="line-number">${i + 1}</span>`
+      ).join('\n');
+
+      const codeHtml = data.highlightedHtml || escHtml(data.content);
+
+      contentPanel.innerHTML = headerHtml +
+        `<div class="file-content-body">
+          <div class="code-viewer">
+            <div class="line-numbers">${lineNums}</div>
+            <pre class="code-content"><code>${codeHtml}</code></pre>
+          </div>
+        </div>`;
+      contentPanel.dataset.rawContent = data.content;
+    }
+  } catch (e) {
+    contentPanel.innerHTML =
+      `<div class="file-content-body"><div class="error" style="margin:16px;">Error: ${e.message}</div></div>`;
+  }
+}
+
+function copyFileContent(btn) {
+  const panel = document.getElementById('file-content-panel');
+  const rawContent = panel.dataset.rawContent || '';
+  const codeEl = panel.querySelector('.code-content code');
+  const text = rawContent || (codeEl ? codeEl.textContent : '');
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text);
+    } else {
+      copyToClipboardFallback(text);
+    }
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  } catch (err) {
+    btn.textContent = 'Error';
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
   }
 }
 
