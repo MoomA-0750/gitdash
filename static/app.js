@@ -6,6 +6,7 @@ let currentTab = 'dashboard';
 let currentFilePath = '';
 let authHeader = null;
 let currentUsername = null;
+let viewMode = 'repo'; // 'repo' | 'user-settings'
 
 // --- 認証ヘルパー ---
 function makeBasicAuth(user, pass) {
@@ -80,6 +81,8 @@ function doLogout() {
   authHeader = null;
   currentUsername = null;
   currentRepo = null;
+  viewMode = 'repo';
+  document.getElementById('tabs-bar').style.display = 'flex';
   updateUserBar();
   loadRepos();
   document.getElementById('content').innerHTML =
@@ -92,7 +95,10 @@ function updateUserBar() {
   if (currentUsername) {
     bar.innerHTML = `
       <span class="username">👤 ${escHtml(currentUsername)}</span>
-      <button class="btn-logout" onclick="doLogout()">ログアウト</button>`;
+      <div class="user-bar-actions">
+        <button class="btn-user-settings" onclick="showUserSettings()" title="ユーザー設定">⚙️</button>
+        <button class="btn-logout" onclick="doLogout()">ログアウト</button>
+      </div>`;
     if (createBtn) createBtn.style.display = 'flex';
   } else {
     bar.innerHTML = `
@@ -191,23 +197,17 @@ async function changeVisibility() {
     });
     currentVisibility = newVis;
     await loadRepos();
-    renderDashboard();
+    showTab(currentTab);
   } catch (e) {
     alert(`可視性の変更に失敗しました: ${e.message}`);
   }
 }
 
 // --- 共有管理 ---
-async function renderSharedPanel() {
-  const panelId = 'shared-panel';
-  let panel = document.getElementById(panelId);
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = panelId;
-    panel.className = 'shared-panel';
-    document.getElementById('content').appendChild(panel);
-  }
-  panel.innerHTML = '<div class="loading" style="padding:8px;">Loading...</div>';
+async function renderSharedPanelInto(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '<div class="loading" style="padding:8px;">Loading...</div>';
 
   try {
     const data = await apiFetch(repoParams({ action: 'get_shared' }));
@@ -218,8 +218,7 @@ async function renderSharedPanel() {
         <button class="btn-remove-shared" onclick="removeSharedUser('${escHtml(u)}')">削除</button>
       </div>`).join('');
 
-    panel.innerHTML = `
-      <h3 class="shared-panel-title">共有設定</h3>
+    container.innerHTML = `
       <div id="shared-user-list">
         ${users.length > 0 ? userItems : '<div class="shared-empty">共有ユーザーなし</div>'}
       </div>
@@ -229,8 +228,12 @@ async function renderSharedPanel() {
       </div>
       <div id="shared-error" class="modal-error" style="display:none;margin-top:6px;"></div>`;
   } catch (e) {
-    panel.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+    container.innerHTML = `<div class="error">Error: ${e.message}</div>`;
   }
+}
+
+async function renderSharedPanel() {
+  await renderSharedPanelInto('settings-shared-container');
 }
 
 async function addSharedUser() {
@@ -347,25 +350,55 @@ function selectRepo(repo, el) {
   currentRepo       = repo.name;
   currentVisibility = repo.visibility;
   currentOwner      = repo.owner;
+
+  // ユーザー設定モードから復帰
+  if (viewMode === 'user-settings') {
+    viewMode = 'repo';
+    document.getElementById('tabs-bar').style.display = 'flex';
+  }
+
+  // 非オーナーが settings タブにいた場合は dashboard にフォールバック
+  if (currentTab === 'settings' && !(currentUsername && currentUsername === currentOwner)) {
+    currentTab = 'dashboard';
+  }
+
   showTab(currentTab);
 }
 
 // --- タブ ---
+function updateSettingsTabVisibility() {
+  const settingsTab = document.getElementById('tab-settings');
+  if (!settingsTab) return;
+  const isOwner = currentUsername && currentUsername === currentOwner;
+  settingsTab.style.display = isOwner ? '' : 'none';
+}
+
 function showTab(tab) {
+  // ユーザー設定モードから復帰
+  if (viewMode === 'user-settings') {
+    viewMode = 'repo';
+    document.getElementById('tabs-bar').style.display = 'flex';
+  }
+
   currentTab = tab;
+  const tabNames = ['dashboard', 'commits', 'files', 'diff', 'settings'];
   document.querySelectorAll('.tab').forEach((t, i) => {
-    t.classList.toggle('active',
-      ['dashboard', 'commits', 'files', 'diff'][i] === tab);
+    t.classList.toggle('active', tabNames[i] === tab);
   });
+
   if (!currentRepo) {
     document.getElementById('content').innerHTML =
       '<div class="loading">リポジトリを選択してください</div>';
     return;
   }
+
+  updateSettingsTabVisibility();
+
   if (tab === 'dashboard') renderDashboard();
   else if (tab === 'commits') renderCommits();
   else if (tab === 'files') renderFiles();
   else if (tab === 'diff') renderDiff();
+  else if (tab === 'settings') renderRepoSettings();
 }
 
 function repoParams(extra) {
@@ -423,10 +456,6 @@ async function renderDashboard() {
       c.innerHTML = `
         <div class="repo-title">
           <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}${ownerLabel}
-          ${currentUsername && currentUsername === currentOwner
-            ? `<button class="btn-change-visibility" onclick="changeVisibility()">${currentVisibility === 'public' ? 'privateに変更' : 'publicに変更'}</button>
-               <button class="btn-delete-repo" onclick="deleteRepo()">リポジトリを削除</button>`
-            : ''}
         </div>
         <div class="clone-url-box">
           <span class="clone-label">Clone:</span>
@@ -452,10 +481,6 @@ git remote add origin ${escHtml(cloneUrl)}
 git push -u origin main</pre>
           </div>
         </div>`;
-      // 空リポジトリでもオーナーは共有管理パネルを表示
-      if (currentUsername && currentUsername === currentOwner) {
-        await renderSharedPanel();
-      }
       return;
     }
 
@@ -470,10 +495,6 @@ git push -u origin main</pre>
     c.innerHTML = `
       <div class="repo-title">
         <h2>${escHtml(currentRepo.replace('.git',''))}</h2>${visLabel}${ownerLabel}
-        ${currentUsername && currentUsername === currentOwner
-          ? `<button class="btn-change-visibility" onclick="changeVisibility()">${currentVisibility === 'public' ? 'privateに変更' : 'publicに変更'}</button>
-             <button class="btn-delete-repo" onclick="deleteRepo()">リポジトリを削除</button>`
-          : ''}
       </div>
       <div class="clone-url-box">
         <span class="clone-label">Clone:</span>
@@ -499,11 +520,6 @@ git push -u origin main</pre>
         ${data.commits.slice(0, 1).map(renderCommitCard).join('')}
       </div>
       ${readmeHtml}`;
-
-    // オーナーのみ共有管理パネルを表示
-    if (currentUsername && currentUsername === currentOwner) {
-      await renderSharedPanel();
-    }
   } catch (e) {
     c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
   }
@@ -985,6 +1001,199 @@ document.addEventListener('click', async (e) => {
     }, 2000);
   }
 });
+
+// --- リポジトリ設定タブ ---
+async function renderRepoSettings() {
+  const c = document.getElementById('content');
+
+  if (!(currentUsername && currentUsername === currentOwner)) {
+    c.innerHTML = '<div class="loading">アクセス権限がありません</div>';
+    return;
+  }
+
+  const repoLabel = currentRepo.replace('.git', '');
+  const visLabel = currentVisibility === 'private'
+    ? '<span class="badge badge-private">private</span>'
+    : '<span class="badge badge-public">public</span>';
+
+  c.innerHTML = `
+    <div class="settings-page">
+      <h2 class="settings-title">⚙️ ${escHtml(repoLabel)} の設定</h2>
+
+      <div class="settings-section">
+        <h3 class="settings-section-title">可視性</h3>
+        <div class="settings-section-body">
+          <p class="settings-description">現在の可視性: ${visLabel}</p>
+          <button class="btn-change-visibility" onclick="changeVisibility()">
+            ${currentVisibility === 'public' ? 'privateに変更' : 'publicに変更'}
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3 class="settings-section-title">共有設定</h3>
+        <div class="settings-section-body" id="settings-shared-container">
+          <div class="loading" style="padding:8px;">Loading...</div>
+        </div>
+      </div>
+
+      <div class="settings-section settings-danger-zone">
+        <h3 class="settings-section-title settings-danger-title">Danger Zone</h3>
+        <div class="settings-section-body">
+          <div class="settings-danger-item">
+            <div>
+              <strong>リポジトリを削除</strong>
+              <p class="settings-description">この操作は取り消せません。リポジトリのすべてのデータが永久に削除されます。</p>
+            </div>
+            <button class="btn-delete-repo" onclick="deleteRepo()">リポジトリを削除</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  await renderSharedPanelInto('settings-shared-container');
+}
+
+// --- ユーザー設定画面 ---
+async function showUserSettings() {
+  viewMode = 'user-settings';
+  currentTab = null;
+
+  document.getElementById('tabs-bar').style.display = 'none';
+  document.querySelectorAll('.repo-item').forEach(i => i.classList.remove('active'));
+
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="loading">Loading...</div>';
+
+  try {
+    const data = await apiFetch({ action: 'user_repos_detail' });
+    renderUserSettingsView(data);
+  } catch (e) {
+    c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+  }
+}
+
+function renderUserSettingsView(data) {
+  const c = document.getElementById('content');
+  const repos = data.repos || [];
+
+  let repoCards = '';
+  if (repos.length === 0) {
+    repoCards = '<div class="shared-empty" style="padding:16px;">リポジトリがありません</div>';
+  } else {
+    repoCards = repos.map((repo, idx) => {
+      const label = repo.name.replace('.git', '');
+      const visBadge = repo.visibility === 'private'
+        ? '<span class="badge badge-private">private</span>'
+        : '<span class="badge badge-public">public</span>';
+      const sharedUsers = repo.sharedWith || [];
+      const sharedList = sharedUsers.length > 0
+        ? sharedUsers.map(u =>
+            `<span class="user-settings-shared-tag">👤 ${escHtml(u)}
+              <button class="btn-remove-shared-inline" onclick="removeSharedUserFromUserSettings(${idx}, '${escHtml(repo.name)}', '${escHtml(repo.visibility)}', '${escHtml(u)}')">×</button>
+            </span>`
+          ).join('')
+        : '<span class="shared-empty">共有ユーザーなし</span>';
+
+      return `
+        <div class="user-settings-repo-card">
+          <div class="user-settings-repo-header" onclick="toggleUserSettingsRepo(${idx})">
+            <span class="diff-arrow" id="user-settings-arrow-${idx}">▶</span>
+            <span class="user-settings-repo-name">${escHtml(label)}</span>
+            ${visBadge}
+            ${sharedUsers.length > 0 ? `<span class="user-settings-shared-count">${sharedUsers.length} 共有</span>` : ''}
+          </div>
+          <div class="user-settings-repo-body" id="user-settings-body-${idx}" style="display:none">
+            <div class="user-settings-shared-section">
+              <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">共有ユーザー</div>
+              <div id="user-settings-shared-${idx}">
+                ${sharedList}
+              </div>
+              <div class="shared-add-row" style="margin-top:8px;">
+                <input type="text" id="user-settings-add-input-${idx}" placeholder="ユーザー名を入力" autocomplete="off">
+                <button class="btn btn-primary" style="padding:4px 12px;font-size:12px;"
+                  onclick="addSharedUserFromUserSettings(${idx}, '${escHtml(repo.name)}', '${escHtml(repo.visibility)}')">追加</button>
+              </div>
+              <div id="user-settings-error-${idx}" class="modal-error" style="display:none;margin-top:6px;"></div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  c.innerHTML = `
+    <div class="settings-page">
+      <h2 class="settings-title">⚙️ ユーザー設定</h2>
+      <p class="settings-description" style="margin-bottom:20px;">
+        ${escHtml(currentUsername)} が所有するリポジトリの共有管理
+      </p>
+      ${repoCards}
+    </div>`;
+}
+
+function toggleUserSettingsRepo(idx) {
+  const body = document.getElementById(`user-settings-body-${idx}`);
+  const arrow = document.getElementById(`user-settings-arrow-${idx}`);
+  if (body.style.display === 'none') {
+    body.style.display = '';
+    arrow.textContent = '▼';
+  } else {
+    body.style.display = 'none';
+    arrow.textContent = '▶';
+  }
+}
+
+async function addSharedUserFromUserSettings(idx, repoName, visibility) {
+  const input = document.getElementById(`user-settings-add-input-${idx}`);
+  const errEl = document.getElementById(`user-settings-error-${idx}`);
+  const username = (input.value || '').trim();
+  if (!username) return;
+  if (username === currentUsername) {
+    errEl.textContent = 'オーナー自身は共有リストに追加できません';
+    errEl.style.display = 'block';
+    return;
+  }
+  try {
+    const data = await apiFetch({
+      action: 'get_shared', repo: repoName,
+      visibility: visibility, owner: currentUsername
+    });
+    const users = data.sharedWith || [];
+    if (users.includes(username)) {
+      errEl.textContent = `${username} は既に共有されています`;
+      errEl.style.display = 'block';
+      return;
+    }
+    await apiPost('set_shared', {
+      repoName, visibility, owner: currentUsername,
+      sharedUsers: [...users, username]
+    });
+    input.value = '';
+    errEl.style.display = 'none';
+    await showUserSettings();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+async function removeSharedUserFromUserSettings(idx, repoName, visibility, username) {
+  try {
+    const data = await apiFetch({
+      action: 'get_shared', repo: repoName,
+      visibility: visibility, owner: currentUsername
+    });
+    const users = (data.sharedWith || []).filter(u => u !== username);
+    await apiPost('set_shared', {
+      repoName, visibility, owner: currentUsername,
+      sharedUsers: users
+    });
+    await showUserSettings();
+    await loadRepos();
+  } catch (e) {
+    alert(`削除に失敗しました: ${e.message}`);
+  }
+}
 
 // 初期化
 loadRepos();

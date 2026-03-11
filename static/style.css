@@ -1174,3 +1174,175 @@ code {
   color: var(--text);
   user-select: all;
 }
+
+/* ユーザーバー アクション */
+.user-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-user-settings {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s;
+}
+
+.btn-user-settings:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+/* リポジトリ設定ページ */
+.settings-page {
+  max-width: 720px;
+}
+
+.settings-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-description {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+
+.settings-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.settings-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.settings-section-body {
+  padding: 16px 20px;
+}
+
+/* Danger Zone */
+.settings-danger-zone {
+  border-color: var(--red);
+}
+
+.settings-danger-title {
+  color: var(--red);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--red);
+}
+
+.settings-danger-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+}
+
+.settings-danger-item span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ユーザー設定ページ */
+.user-settings-repo-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.user-settings-repo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+
+.user-settings-repo-header:hover {
+  background: var(--border);
+}
+
+.user-settings-repo-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-settings-shared-count {
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--bg);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.user-settings-repo-body {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.user-settings-shared-section {
+  margin-bottom: 12px;
+}
+
+.user-settings-shared-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 4px 10px;
+  margin: 3px 4px 3px 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.btn-remove-shared-inline {
+  background: none;
+  border: none;
+  color: var(--red);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.btn-remove-shared-inline:hover {
+  opacity: 1;
+}

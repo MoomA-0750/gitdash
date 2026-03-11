@@ -236,6 +236,14 @@ async function handleApi(req, res, params) {
         sendJson(res, result);
         break;
       }
+      case 'user_repos_detail': {
+        const username = await getCurrentUser(req);
+        if (!username) {
+          return sendError(res, 'ログインが必要です', 401);
+        }
+        sendJson(res, git.getUserReposWithSharing(username));
+        break;
+      }
       default:
         sendError(res, 'unknown action', 400);
     }

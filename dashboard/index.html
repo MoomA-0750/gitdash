@@ -51,11 +51,12 @@
 </div>
 
 <div id="main">
-  <div class="tabs">
+  <div class="tabs" id="tabs-bar">
     <div class="tab active" onclick="showTab('dashboard')">Dashboard</div>
     <div class="tab" onclick="showTab('commits')">Commits</div>
     <div class="tab" onclick="showTab('files')">Files</div>
     <div class="tab" onclick="showTab('diff')">Diff</div>
+    <div class="tab" id="tab-settings" onclick="showTab('settings')" style="display:none">Settings</div>
   </div>
   <div id="content"><div class="loading">リポジトリを選択してください</div></div>
 </div>
