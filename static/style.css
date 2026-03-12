@@ -1175,6 +1175,55 @@ code {
   user-select: all;
 }
 
+/* ブランチセレクター */
+.branch-selector-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.branch-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.branch-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 4px 8px;
+  font-size: 13px;
+  font-family: monospace;
+  cursor: pointer;
+  outline: none;
+  min-width: 140px;
+}
+
+.branch-select:focus {
+  border-color: var(--blue);
+}
+
+.branch-select:hover {
+  border-color: var(--muted);
+}
+
+.branch-select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.branch-count {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
 /* ユーザーバー アクション */
 .user-bar-actions {
   display: flex;

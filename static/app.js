@@ -7,6 +7,50 @@ let currentFilePath = '';
 let authHeader = null;
 let currentUsername = null;
 let viewMode = 'repo'; // 'repo' | 'user-settings'
+let currentBranch = '';
+let cachedBranches = null; // { branches: [...], current: '...' }
+
+// --- ブランチヘルパー ---
+function branchParam() {
+  return currentBranch ? { hb: currentBranch } : {};
+}
+
+async function loadBranches() {
+  try {
+    cachedBranches = await apiFetch(repoParams({ action: 'branches' }));
+    if (!currentBranch && cachedBranches.current) {
+      currentBranch = cachedBranches.current;
+    }
+  } catch (e) {
+    cachedBranches = { branches: [], current: '' };
+  }
+}
+
+function renderBranchSelector() {
+  if (!cachedBranches || cachedBranches.empty || cachedBranches.branches.length === 0) {
+    return '';
+  }
+  const branches = cachedBranches.branches;
+  const selected = currentBranch || cachedBranches.current || 'HEAD';
+  const options = branches.map(b => {
+    const sel = b === selected ? ' selected' : '';
+    const defaultLabel = b === cachedBranches.current ? ' (default)' : '';
+    return `<option value="${escHtml(b)}"${sel}>${escHtml(b)}${defaultLabel}</option>`;
+  }).join('');
+  return `
+    <div class="branch-selector-bar">
+      <span class="branch-icon">🌿</span>
+      <select class="branch-select" onchange="switchBranch(this.value)">
+        ${options}
+      </select>
+      <span class="branch-count">${branches.length} branch${branches.length !== 1 ? 'es' : ''}</span>
+    </div>`;
+}
+
+function switchBranch(branchName) {
+  currentBranch = branchName;
+  showTab(currentTab);
+}
 
 // --- 認証ヘルパー ---
 function makeBasicAuth(user, pass) {
@@ -350,6 +394,8 @@ function selectRepo(repo, el) {
   currentRepo       = repo.name;
   currentVisibility = repo.visibility;
   currentOwner      = repo.owner;
+  currentBranch     = '';
+  cachedBranches    = null;
 
   // ユーザー設定モードから復帰
   if (viewMode === 'user-settings') {
@@ -373,7 +419,7 @@ function updateSettingsTabVisibility() {
   settingsTab.style.display = isOwner ? '' : 'none';
 }
 
-function showTab(tab) {
+async function showTab(tab) {
   // ユーザー設定モードから復帰
   if (viewMode === 'user-settings') {
     viewMode = 'repo';
@@ -393,6 +439,11 @@ function showTab(tab) {
   }
 
   updateSettingsTabVisibility();
+
+  // ブランチ情報をロード（Dashboard / Commits / Files タブで必要）
+  if (['dashboard', 'commits', 'files'].includes(tab) && !cachedBranches) {
+    await loadBranches();
+  }
 
   if (tab === 'dashboard') renderDashboard();
   else if (tab === 'commits') renderCommits();
@@ -440,8 +491,8 @@ async function renderDashboard() {
   c.innerHTML = '<div class="loading">Loading...</div>';
   try {
     const [data, readmeData] = await Promise.all([
-      apiFetch(repoParams({ action: 'commits' })),
-      apiFetch(repoParams({ action: 'readme' }))
+      apiFetch(repoParams({ action: 'commits', ...branchParam() })),
+      apiFetch(repoParams({ action: 'readme', ...branchParam() }))
     ]);
     const visLabel = currentVisibility === 'private'
       ? '<span class="badge badge-private">private</span>'
@@ -501,6 +552,7 @@ git push -u origin main</pre>
         <code>${escHtml(cloneUrl)}</code>
         <button class="btn-copy" onclick="copyCloneUrl(this)">Copy</button>
       </div>
+      ${renderBranchSelector()}
       <div class="stats">
         <div class="stat-card">
           <div class="stat-num">${data.commits.length}</div>
@@ -541,13 +593,14 @@ async function renderCommits() {
   const c = document.getElementById('content');
   c.innerHTML = '<div class="loading">Loading...</div>';
   try {
-    const data = await apiFetch(repoParams({ action: 'commits' }));
+    const data = await apiFetch(repoParams({ action: 'commits', ...branchParam() }));
     if (data.empty) {
       c.innerHTML = '<div class="loading">空のリポジトリです — まだコミットがありません</div>';
     } else {
-      c.innerHTML = data.commits.length
+      const branchBar = renderBranchSelector();
+      c.innerHTML = branchBar + (data.commits.length
         ? data.commits.map(renderCommitCard).join('')
-        : '<div class="loading">コミットがありません</div>';
+        : '<div class="loading">このブランチにはコミットがありません</div>');
     }
   } catch (e) {
     c.innerHTML = `<div class="error">Error: ${e.message}</div>`;
@@ -560,6 +613,7 @@ async function renderFiles() {
   currentFilePath = '';
 
   c.innerHTML = `
+    ${renderBranchSelector()}
     <div class="file-viewer-container">
       <div class="file-tree-panel" id="file-tree-panel">
         <div class="file-tree-header">Files</div>
@@ -583,7 +637,7 @@ async function loadFileTree(filePath) {
   treeContent.innerHTML = '<div class="loading" style="padding:12px;">Loading...</div>';
 
   try {
-    const data = await apiFetch(repoParams({ action: 'tree', f: filePath }));
+    const data = await apiFetch(repoParams({ action: 'tree', f: filePath, ...branchParam() }));
     if (data.empty) {
       treeContent.innerHTML = '<div class="loading" style="padding:12px;">空のリポジトリです</div>';
       return;
@@ -627,7 +681,7 @@ async function loadFileContent(filePath) {
   });
 
   try {
-    const data = await apiFetch(repoParams({ action: 'blob', f: filePath, hb: 'HEAD' }));
+    const data = await apiFetch(repoParams({ action: 'blob', f: filePath, ...branchParam() }));
     const fileName = filePath.split('/').pop();
 
     // サイズ表示

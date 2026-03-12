@@ -103,7 +103,10 @@ async function handleApi(req, res, params) {
         break;
       }
       case 'commits':
-        sendJson(res, await git.getCommits(repo, visibility, owner));
+        sendJson(res, await git.getCommits(repo, visibility, owner, hb));
+        break;
+      case 'branches':
+        sendJson(res, await git.getBranches(repo, visibility, owner));
         break;
       case 'diff':
         sendJson(res, await git.getDiff(repo, h, visibility, owner));
@@ -128,7 +131,7 @@ async function handleApi(req, res, params) {
         break;
       }
       case 'readme': {
-        const readmeData = await git.getReadme(repo, visibility, owner);
+        const readmeData = await git.getReadme(repo, visibility, owner, hb);
         // サーバーサイドでマークダウンをHTMLに変換
         if (readmeData.readme) {
           readmeData.readmeHtml = await parseMarkdown(readmeData.readme);
