@@ -281,7 +281,7 @@ const server = http.createServer(async (req, res) => {
     // ダッシュボード（ルート）
     if (pathname === BASE_PATH + '/' || pathname === BASE_PATH + '/index.html' || pathname === BASE_PATH) {
       let html = fs.readFileSync(path.join(__dirname, 'dashboard', 'index.html'), 'utf8');
-      html = html.replace('__BASE_PATH__', BASE_PATH);
+      html = html.replace(/__BASE_PATH__/g, BASE_PATH);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
       res.end(html);
       return;
